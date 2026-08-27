@@ -103,3 +103,53 @@ def score_portfolio(portfolio, static_model, dynamic_model):
     portfolio["static_risk"] = static_model.predict_proba(portfolio[STATIC_FEATURE_COLS_V2])[:, 1]
     portfolio["dynamic_risk"] = dynamic_model.predict_proba(portfolio[DYN_FEATURE_COLS])[:, 1]
     return portfolio
+
+
+def load_all_checkpoints():
+    """Full checkpoint table (all issues, all checkpoints they reached),
+    with pattern_label and log1p_stall attached. Used to build per-issue
+    risk trajectories -- filter to one Issue_ID at call time."""
+    ck = pd.read_csv(f"{FEATURES_DIR}/phase8_checkpoints.csv")
+    pattern = pd.read_csv(f"{FEATURES_DIR}/phase8_checkpoints_with_pattern.csv")
+    ck = ck.merge(pattern, on=["Issue_ID", "checkpoint_index"], how="left")
+    ck["log1p_stall"] = np.log1p(ck["stall_ratio"])
+    return ck
+
+
+def build_issue_trajectory(issue_id, static_row, all_checkpoints, dynamic_model):
+    """Score the dynamic model at every checkpoint this issue actually
+    reached, holding its static features fixed (they don't vary by
+    checkpoint) and using each checkpoint's own log1p_stall/elapsed_minutes
+    /pattern_label."""
+    issue_ck = all_checkpoints[all_checkpoints["Issue_ID"] == issue_id].sort_values("checkpoint_index")
+    if issue_ck.empty:
+        return pd.DataFrame(columns=["checkpoint_index", "risk"])
+
+    rows = issue_ck[["checkpoint_index", "log1p_stall", "elapsed_minutes", "pattern_label"]].copy()
+    for col in STATIC_FEATURE_COLS_V2:
+        rows[col] = static_row[col]
+
+    for col in CATEGORICAL_COLS:
+        rows[col] = rows[col].astype("category")
+    rows["pattern_label"] = rows["pattern_label"].astype("category")
+    for col in STATIC_FEATURE_COLS_V2 + ["log1p_stall", "elapsed_minutes"]:
+        if col not in CATEGORICAL_COLS:
+            rows[col] = rows[col].astype(float)
+
+    rows["risk"] = dynamic_model.predict_proba(rows[DYN_FEATURE_COLS])[:, 1]
+    return rows[["checkpoint_index", "risk"]].reset_index(drop=True)
+
+
+def risk_band(risk):
+    if risk < 0.4:
+        return "low"
+    elif risk < 0.7:
+        return "medium"
+    return "high"
+
+
+RISK_COLORS = {"low": "#1baf7a", "medium": "#eda100", "high": "#e34948"}
+
+
+def risk_color(risk):
+    return RISK_COLORS[risk_band(risk)]
