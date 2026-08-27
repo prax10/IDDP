@@ -1,0 +1,77 @@
+{
+  "n_train": 162632,
+  "n_test": 40658,
+  "features": [
+    "Project_ID",
+    "Priority_Normalized",
+    "Type_Normalized",
+    "Story_Point",
+    "assignee_prior_resolved_count",
+    "assignee_prior_delay_rate",
+    "assignee_concurrent_open",
+    "is_unassigned",
+    "n_links",
+    "n_blocking_links",
+    "text_pc_0",
+    "text_pc_1",
+    "text_pc_2",
+    "text_pc_3",
+    "text_pc_4",
+    "text_pc_5",
+    "text_pc_6",
+    "text_pc_7",
+    "text_pc_8",
+    "text_pc_9",
+    "text_pc_10",
+    "text_pc_11",
+    "text_pc_12",
+    "text_pc_13",
+    "text_pc_14",
+    "text_pc_15",
+    "text_pc_16",
+    "text_pc_17",
+    "text_pc_18",
+    "text_pc_19",
+    "text_pc_20",
+    "text_pc_21",
+    "text_pc_22",
+    "text_pc_23",
+    "text_pc_24",
+    "text_pc_25",
+    "text_pc_26",
+    "text_pc_27",
+    "text_pc_28",
+    "text_pc_29"
+  ],
+  "model": {
+    "auc": 0.734276580050744,
+    "f1": 0.6538360827441738,
+    "precision": 0.6811981667394151,
+    "recall": 0.6285872520390696,
+    "accuracy": 0.6748487382556938,
+    "confusion_matrix": [
+      [
+        14953,
+        5843
+      ],
+      [
+        7377,
+        12485
+      ]
+    ]
+  },
+  "majority_baseline": {
+    "majority_class": 1,
+    "f1": 0.6563780568407138,
+    "accuracy": 0.48851394559496286
+  },
+  "hyperparameters": {
+    "n_estimators": 400,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "eval_metric": "logloss"
+  },
+  "baseline_v1_auc_no_text": 0.7242
+}
