@@ -1,0 +1,9 @@
+Result,Old label (full-population median),New label (train+val median)
+Phase 7 static AUC,0.7343,0.7526
+Pooled dynamic (with-pattern) crossover vs static,M6,NEVER (static wins all 10 checkpoints)
+Per-checkpoint dynamic crossover vs static,M3,M3
+Per-checkpoint M10 AUC,0.880988,0.8638
+Pooled (with-pattern) M10 AUC,0.734089,0.727
+Phase 9 cross-project mean AUC,0.7173,0.7103
+Phase 9 within-project mean AUC,0.654,0.6571
+Cross-beats-within count,33/38,30/38
