@@ -1,0 +1,54 @@
+{
+  "n_train": 162632,
+  "n_test": 40658,
+  "test_split_matches_phase8": true,
+  "model": {
+    "auc": 0.7242451795538862,
+    "f1": 0.6411971551701345,
+    "precision": 0.6751294471354602,
+    "recall": 0.6105125365018629,
+    "accuracy": 0.6662157508977323,
+    "confusion_matrix": [
+      [
+        14961,
+        5835
+      ],
+      [
+        7736,
+        12126
+      ]
+    ]
+  },
+  "majority_baseline": {
+    "majority_class": 1,
+    "f1": 0.6563780568407138,
+    "precision": 0.48851394559496286,
+    "recall": 1.0,
+    "accuracy": 0.48851394559496286
+  },
+  "hyperparameters": {
+    "n_estimators": 400,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "eval_metric": "logloss"
+  },
+  "threshold_tuning": {
+    "default_threshold_0.5": {
+      "threshold": 0.5,
+      "test_f1": 0.6411971551701345,
+      "test_precision": 0.6751294471354602,
+      "test_recall": 0.6105125365018629,
+      "test_accuracy": 0.6662157508977323
+    },
+    "tuned_on_train": {
+      "threshold": 0.385,
+      "train_f1_at_threshold": 0.7314484791638751,
+      "test_f1": 0.6830693326408726,
+      "test_precision": 0.5989753320683112,
+      "test_recall": 0.7946329674755815,
+      "test_accuracy": 0.6397756899011264
+    }
+  }
+}
