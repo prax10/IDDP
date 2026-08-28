@@ -432,13 +432,20 @@ with tab2:
         checkpoint_time = row["Creation_Date"] + pd.Timedelta(minutes=row["elapsed_minutes"])
         avg_delay_rate = ex.project_avg_delay_rate(feat_full, row["Project_ID"])
 
-        bullets = ex.generate_explanation(
+        explanation = ex.generate_explanation(
             row, contrib, ref_stats, avg_delay_rate,
             current_status=current_status, last_status_change_time=last_change, checkpoint_time=checkpoint_time,
+            predicted_risk=row["dynamic_risk"],
         )
-        st.markdown(f"**Why this issue is flagged ({row['dynamic_risk']:.0%} risk):**")
-        for b in bullets:
-            st.markdown(f"- {b}")
+        st.markdown(explanation["summary"])
+        if explanation["raising"]:
+            st.markdown("⬆️ **Raising the risk estimate**")
+            for b in explanation["raising"]:
+                st.markdown(f"- {b}")
+        if explanation["lowering"]:
+            st.markdown("⬇️ **Lowering the risk estimate**")
+            for b in explanation["lowering"]:
+                st.markdown(f"- {b}")
 
         # --- Peer comparison ---
         st.subheader("Peer comparison")

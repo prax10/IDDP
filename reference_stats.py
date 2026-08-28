@@ -18,16 +18,17 @@ RAW_DIR = "data/raw"
 MIN_GROUP = 5
 
 
-def _hierarchical_median_lookup(df, group_levels, value_col):
+def _hierarchical_median_lookup(df, group_levels, value_col, agg="median"):
     """group_levels: list of tuples (cols,) most specific first. Returns a
-    function key_tuple_per_level -> median, falling back down levels."""
+    function key_tuple_per_level -> agg(value_col), falling back down levels.
+    agg='median' for durations, agg='mean' for a rate (e.g. delay rate)."""
     medians = []
     for cols in group_levels:
         if cols:
-            m = df.groupby(list(cols), observed=True)[value_col].median()
+            m = df.groupby(list(cols), observed=True)[value_col].agg(agg)
             n = df.groupby(list(cols), observed=True)[value_col].size()
         else:
-            m = pd.Series({(): df[value_col].median()})
+            m = pd.Series({(): df[value_col].agg(agg)})
             n = pd.Series({(): len(df)})
         medians.append((cols, m, n))
     return medians
@@ -56,6 +57,20 @@ class ReferenceStats:
         self.n_links_by_project = {
             p: g["n_links"].to_numpy() for p, g in feat_full.groupby("Project_ID", observed=True)
         }
+        self.delay_rate_medians = _hierarchical_median_lookup(
+            feat_full,
+            [("Project_ID", "Type_Normalized", "Priority_Normalized"),
+             ("Project_ID", "Type_Normalized"),
+             ("Project_ID",), ()],
+            "delayed_v2", agg="mean",
+        )
+
+    def type_priority_delay_rate(self, project_id, type_norm, priority_norm):
+        row = {"Project_ID": project_id, "Type_Normalized": type_norm, "Priority_Normalized": priority_norm}
+        val = _query_hierarchical_safe(
+            self.delay_rate_medians, row, ["Project_ID", "Type_Normalized", "Priority_Normalized"]
+        )
+        return None if val is None or np.isnan(val) else val
 
     def expected_duration_minutes(self, row):
         return _query_hierarchical_safe(self.duration_medians, row,
@@ -66,10 +81,21 @@ class ReferenceStats:
         return _query_hierarchical_safe(self.dwell_medians, row, ["Status", "Project_ID", "Type_Normalized"])
 
     def n_links_percentile(self, project_id, n_links_value):
+        """Fraction of issues in this project with STRICTLY FEWER links than
+        n_links_value. Meaningless (always 0) when n_links_value == 0 --
+        use n_links_fraction_with_any for that case instead."""
         arr = self.n_links_by_project.get(project_id)
         if arr is None or len(arr) == 0:
             return None
         return float((arr < n_links_value).mean())
+
+    def n_links_fraction_with_any(self, project_id):
+        """Fraction of issues in this project with at least one link --
+        the right comparison when this issue itself has zero."""
+        arr = self.n_links_by_project.get(project_id)
+        if arr is None or len(arr) == 0:
+            return None
+        return float((arr > 0).mean())
 
 
 def _query_hierarchical_safe(medians, row, all_cols):
