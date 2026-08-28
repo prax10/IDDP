@@ -140,6 +140,85 @@ def build_issue_trajectory(issue_id, static_row, all_checkpoints, dynamic_model)
     return rows[["checkpoint_index", "risk"]].reset_index(drop=True)
 
 
+MISSION_CONTROL_PROJECT = 43
+MISSION_CONTROL_START = pd.Timestamp("2020-01-01")
+MISSION_CONTROL_END = pd.Timestamp("2020-04-30")
+
+
+def load_project_for_replay(project_id, static_model, dynamic_model):
+    """ALL resolved issues in this project (any split -- Mission Control
+    needs the true set of what was open on a given day, which requires
+    issues regardless of which split they landed in), with static risk
+    scored and their full checkpoint trajectory (dynamic risk at each
+    checkpoint they reached, plus each checkpoint's absolute timestamp).
+    """
+    feat = load_feature_table()
+    raw = load_raw_display_fields()
+    proj_ids = raw.loc[raw["Project_ID"] == project_id, "ID"]
+
+    issues = feat[feat["ID"].isin(proj_ids)].merge(
+        raw[["ID", "Title", "Priority", "Type", "Assignee_ID", "Creation_Date"]], on="ID", how="left"
+    )
+    resolution = pd.read_csv(f"{RAW_DIR}/issue.csv", usecols=["ID", "Resolution_Date"], parse_dates=["Resolution_Date"])
+    issues = issues.merge(resolution, on="ID", how="left")
+    issues = _apply_categorical_dtypes(issues)
+    issues["static_risk"] = static_model.predict_proba(issues[STATIC_FEATURE_COLS_V2])[:, 1]
+
+    ck = pd.read_csv(f"{FEATURES_DIR}/phase8_checkpoints.csv")
+    pattern = pd.read_csv(f"{FEATURES_DIR}/phase8_checkpoints_with_pattern.csv")
+    ck = ck.merge(pattern, on=["Issue_ID", "checkpoint_index"], how="left")
+    ck = ck[ck["Issue_ID"].isin(issues["ID"])].drop(columns=["Project_ID", "Type_Normalized"]).copy()
+    ck["log1p_stall"] = np.log1p(ck["stall_ratio"])
+
+    creation_lookup = issues.set_index("ID")["Creation_Date"]
+    ck["checkpoint_time"] = ck["Issue_ID"].map(creation_lookup) + pd.to_timedelta(ck["elapsed_minutes"], unit="m")
+
+    static_cols_lookup = issues.set_index("ID")[STATIC_FEATURE_COLS_V2]
+    ck = ck.join(static_cols_lookup, on="Issue_ID")
+    for col in CATEGORICAL_COLS:
+        ck[col] = ck[col].astype("category")
+    ck["pattern_label"] = ck["pattern_label"].astype("category")
+    for col in STATIC_FEATURE_COLS_V2 + ["log1p_stall", "elapsed_minutes"]:
+        if col not in CATEGORICAL_COLS:
+            ck[col] = ck[col].astype(float)
+    ck["dynamic_risk"] = dynamic_model.predict_proba(ck[DYN_FEATURE_COLS])[:, 1]
+
+    ck = ck.sort_values("checkpoint_time")
+    checkpoints = ck[["Issue_ID", "checkpoint_index", "checkpoint_time", "dynamic_risk"]].reset_index(drop=True)
+    return issues, checkpoints
+
+
+def risk_at_time(issues, checkpoints, T):
+    """For every issue, its predicted risk as of T: the dynamic model's
+    prediction at the most recent checkpoint with checkpoint_time <= T, or
+    the static (creation-time) prediction if no checkpoint has been
+    reached yet or the latest one reached is still M1/M2."""
+    T = pd.Timestamp(T)
+    query = issues[["ID"]].rename(columns={"ID": "Issue_ID"}).copy()
+    query["checkpoint_time"] = T
+    query["checkpoint_time"] = query["checkpoint_time"].astype(checkpoints["checkpoint_time"].dtype)
+    query = query.sort_values("checkpoint_time")
+
+    matched = pd.merge_asof(
+        query, checkpoints, on="checkpoint_time", by="Issue_ID", direction="backward",
+    )
+    matched = matched.set_index("Issue_ID")
+
+    out = issues[["ID", "static_risk"]].set_index("ID").copy()
+    out["checkpoint_index"] = matched["checkpoint_index"].reindex(out.index)
+    out["dynamic_risk"] = matched["dynamic_risk"].reindex(out.index)
+
+    use_dynamic = out["checkpoint_index"].fillna(0) >= CROSSOVER_CHECKPOINT
+    out["risk"] = np.where(use_dynamic, out["dynamic_risk"], out["static_risk"])
+    out["source"] = np.where(use_dynamic, "dynamic", "static")
+    return out.reset_index()
+
+
+def open_at_time(issues, T):
+    T = pd.Timestamp(T)
+    return (issues["Creation_Date"] <= T) & (issues["Resolution_Date"] > T)
+
+
 def risk_band(risk):
     if risk < 0.4:
         return "low"

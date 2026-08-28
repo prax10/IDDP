@@ -1,12 +1,16 @@
 """
-Phase 12: Streamlit prototype. Demo wrapper around already-final models --
-no retraining, no live Jira sync, no task editing, no notifications.
+Phase 12 (+ Task D "Mission Control"): Streamlit prototype. Demo wrapper
+around already-final models -- no retraining, no live Jira sync, no task
+editing, no notifications. Mission Control replays REAL historical data
+with real leakage-safe predictions -- it is a replay, not a live feed,
+and the UI says so.
 
 Run with: streamlit run app/app.py
 """
 
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -18,6 +22,8 @@ import streamlit as st
 
 import demo_data as dd
 import reassignment as ra
+import reference_stats as rs
+import explain as ex
 
 st.set_page_config(page_title="TAWOS Delay Risk", layout="wide", page_icon="🚦")
 
@@ -26,6 +32,10 @@ CROSSOVER_CHECKPOINT = dd.CROSSOVER_CHECKPOINT  # M3
 GREEN, AMBER, RED = dd.RISK_COLORS["low"], dd.RISK_COLORS["medium"], dd.RISK_COLORS["high"]
 STATIC_TEST_AUC = 0.743
 DYNAMIC_M10_AUC = 0.859
+
+MC_PROJECT = dd.MISSION_CONTROL_PROJECT
+MC_START = dd.MISSION_CONTROL_START
+MC_END = dd.MISSION_CONTROL_END
 
 
 def risk_badge(risk):
@@ -38,6 +48,11 @@ def risk_badge(risk):
 @st.cache_resource
 def get_models():
     return dd.load_models()
+
+
+@st.cache_resource
+def get_reference_stats():
+    return rs.load_reference_stats()
 
 
 @st.cache_data
@@ -62,20 +77,48 @@ def get_all_checkpoints():
     return dd.load_all_checkpoints()
 
 
+@st.cache_data
+def get_checkpoints_with_status():
+    return pd.read_csv(
+        "data/features/phase8_checkpoints.csv",
+        usecols=["Issue_ID", "checkpoint_index", "current_status", "last_status_change_time"],
+        parse_dates=["last_status_change_time"],
+    )
+
+
+@st.cache_data
+def get_mission_control_data(project_id, _static_model, _dynamic_model):
+    return dd.load_project_for_replay(project_id, _static_model, _dynamic_model)
+
+
+@st.cache_data
+def get_mission_control_timeline(project_id, issues, checkpoints, start, end):
+    dates = pd.date_range(start, end, freq="D")
+    rows = []
+    for d in dates:
+        risk_df = dd.risk_at_time(issues, checkpoints, d)
+        open_mask = dd.open_at_time(issues, d)
+        open_risk = risk_df[risk_df["ID"].isin(issues.loc[open_mask, "ID"])]
+        bands = open_risk["risk"].apply(dd.risk_band).value_counts()
+        rows.append({
+            "date": d,
+            "low": bands.get("low", 0), "medium": bands.get("medium", 0), "high": bands.get("high", 0),
+        })
+    return pd.DataFrame(rows)
+
+
 static_model, dynamic_model = get_models()
+ref_stats = get_reference_stats()
 portfolio_raw, feat_full = get_portfolio_data()
 portfolio = get_scored_portfolio(static_model, dynamic_model, portfolio_raw)
 portfolio["at_risk"] = portfolio["dynamic_risk"] >= RISK_THRESHOLD
 all_checkpoints = get_all_checkpoints()
+checkpoint_status = get_checkpoints_with_status()
 
 st.title("TAWOS Issue Delay Risk")
 st.caption(
     f"XGBoost · trained on 203,290 resolved issues across 39 projects · "
     f"AUC {STATIC_TEST_AUC:.3f} static / {DYNAMIC_M10_AUC:.3f} dynamic at M10"
-)
-st.caption(
-    "Prototype demo -- predictions run on held-out test-split issues from the TAWOS dataset, "
-    "used as a stand-in for a 'current' portfolio. See 'How it works' below for details."
 )
 
 with st.expander("How it works", expanded=False):
@@ -83,78 +126,178 @@ with st.expander("How it works", expanded=False):
 - **Label definition:** an issue is "delayed" if its resolution time exceeds its own project's
   *median* resolution time -- and that median is computed **only from training-split issues**
   (never from validation or test issues), so the label itself doesn't leak future information.
-- **Leakage-safe by design:** every feature (assignee history, workload, dependency counts,
-  text embeddings) reflects only information available at or before the issue's own creation time,
-  or, for in-progress predictions, at or before the specific checkpoint being scored.
-- **Predictions for in-progress issues are checkpoint-based:** the model re-evaluates an issue
-  at 10 checkpoints across its expected lifetime (M1 = 10% of expected duration, M10 = 100%+),
-  using only the trajectory observed up to that point.
+- **Leakage-safe by design:** every feature reflects only information available at or before the
+  issue's own creation time, or, for in-progress predictions, at or before the specific checkpoint
+  being scored.
+- **Predictions for in-progress issues are checkpoint-based**, re-evaluated at 10 checkpoints
+  across an issue's expected lifetime.
 - **The key finding driving this app:** dynamic (checkpoint-based) predictions only become more
   reliable than a creation-time-only prediction after roughly **30% of an issue's expected duration
-  has elapsed (checkpoint M3)** -- confirmed via bootstrap confidence intervals, not just a point
-  estimate. Before M3, trust the static/creation-time model; from M3 onward, the dynamic model is
-  the better bet. The risk-trajectory chart in Tab 2 renders this directly.
-- **Decision threshold:** this demo uses **{RISK_THRESHOLD}** for at-risk/on-track calls (matches
-  standard accuracy-style decisions); a threshold of {dd.F1_THRESHOLD} was separately tuned to
-  optimize F1 if that's the operating point you care about.
-- **Risk colour coding (used everywhere in this app):**
+  has elapsed (checkpoint M3)** -- confirmed via bootstrap confidence intervals. Mission Control and
+  the trajectory chart both enforce this rule directly: before M3 you see the static estimate,
+  labelled as such.
+- **Decision threshold:** **{RISK_THRESHOLD}** for at-risk/on-track calls; {dd.F1_THRESHOLD} was
+  separately tuned to optimize F1 if that's the operating point you care about.
+- **Risk colour coding (used everywhere):**
   <span style="color:{GREEN};font-weight:600;">green &lt; 0.4</span>,
   <span style="color:{AMBER};font-weight:600;">amber 0.4-0.7</span>,
   <span style="color:{RED};font-weight:600;">red &gt; 0.7</span>.
-- **Demo data note:** there is no live feed of in-progress issues with computed features in this
-  project, so the app uses held-out (test-split) *resolved* issues, frozen at their last observed
-  checkpoint, as a stand-in "current" portfolio. Predictions shown are the model's -- true outcomes
-  are known only for our own validation, never surfaced except in the trajectory chart's final
-  annotation.
+- **Mission Control is a REPLAY of real historical data, not a live feed.** It shows what the
+  model would genuinely have predicted, day by day, using only information available as of each
+  date shown -- no data has been fabricated or simulated. The window (Project {MC_PROJECT},
+  {MC_START.date()} to {MC_END.date()}) falls entirely within the model's held-out test period.
+- **Other tabs' data note:** outside Mission Control, the app uses held-out (test-split) resolved
+  issues at their last observed checkpoint as a stand-in "current" portfolio, since there is no
+  live feed of in-progress issues with computed features in this project.
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Project Risk Dashboard", "Issue Risk & Explanation", "Team Workload", "Reassignment Suggester"]
+tab_mc, tab2, tab3, tab4 = st.tabs(
+    ["🎛️ Mission Control", "Issue Risk & Explanation", "Team", "Reassignment Suggester"]
 )
 
 # ---------------------------------------------------------------------
-# Tab 1: Project Risk Dashboard
+# Tab: Mission Control (time-travel replay)
 # ---------------------------------------------------------------------
-with tab1:
-    st.header("Project Risk Dashboard")
-    projects = sorted(portfolio["Project_ID"].unique())
-    project_id = st.selectbox("Project", projects, key="tab1_project")
+with tab_mc:
+    st.header("Mission Control -- historical replay")
+    st.caption(
+        f"Replaying **Project {MC_PROJECT}**, {MC_START.date()} to {MC_END.date()} -- real historical "
+        f"issues, real leakage-safe predictions, no simulated data. This window falls entirely within "
+        f"the model's held-out test period."
+    )
 
-    proj_df = portfolio[portfolio["Project_ID"] == project_id]
-    n_at_risk = int(proj_df["at_risk"].sum())
-    n_on_track = len(proj_df) - n_at_risk
-    project_avg_risk = proj_df["dynamic_risk"].mean()
+    mc_issues, mc_checkpoints = get_mission_control_data(MC_PROJECT, static_model, dynamic_model)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("At-risk issues", n_at_risk, f"{n_at_risk/len(proj_df):.0%} of portfolio")
-    col2.metric("On-track issues", n_on_track, f"{n_on_track/len(proj_df):.0%} of portfolio")
-    col3.metric("Avg predicted risk", f"{project_avg_risk:.0%}")
+    if "mc_cursor" not in st.session_state:
+        st.session_state.mc_cursor = MC_START
+    if "mc_playing" not in st.session_state:
+        st.session_state.mc_playing = False
 
-    st.subheader("Predicted risk distribution")
-    fig, ax = plt.subplots(figsize=(9, 2.6))
-    ax.axvspan(0, 0.4, color=GREEN, alpha=0.08)
-    ax.axvspan(0.4, 0.7, color=AMBER, alpha=0.08)
-    ax.axvspan(0.7, 1.0, color=RED, alpha=0.08)
-    ax.hist(proj_df["dynamic_risk"], bins=25, range=(0, 1), color="#4C78A8", edgecolor="white")
-    ax.axvline(RISK_THRESHOLD, color="black", linestyle="--", linewidth=1, label=f"threshold ({RISK_THRESHOLD})")
-    ax.set_xlabel("Predicted risk", fontsize=11)
-    ax.set_ylabel("Issue count", fontsize=11)
-    ax.legend(fontsize=9)
-    ax.set_xlim(0, 1)
+    col_a, col_b, col_c = st.columns([2, 1, 1])
+    with col_a:
+        cursor_date = st.slider(
+            "Replay date", min_value=MC_START.to_pydatetime(), max_value=MC_END.to_pydatetime(),
+            value=st.session_state.mc_cursor.to_pydatetime(), format="YYYY-MM-DD", key="mc_slider",
+        )
+        st.session_state.mc_cursor = pd.Timestamp(cursor_date)
+    with col_b:
+        step_label = st.selectbox("Step size", ["1 day", "1 week"], index=1, key="mc_step")
+        step = pd.Timedelta(days=1) if step_label == "1 day" else pd.Timedelta(weeks=1)
+    with col_c:
+        playing = st.checkbox("▶ Play", value=st.session_state.mc_playing, key="mc_play_checkbox")
+        st.session_state.mc_playing = playing
+
+    T = st.session_state.mc_cursor
+    T_prev = max(MC_START, T - step)
+
+    risk_cur = dd.risk_at_time(mc_issues, mc_checkpoints, T).set_index("ID")
+    risk_prev = dd.risk_at_time(mc_issues, mc_checkpoints, T_prev).set_index("ID")
+    open_cur_mask = dd.open_at_time(mc_issues, T)
+    open_prev_mask = dd.open_at_time(mc_issues, T_prev)
+
+    open_cur_ids = set(mc_issues.loc[open_cur_mask, "ID"])
+    open_prev_ids = set(mc_issues.loc[open_prev_mask, "ID"])
+
+    n_open = len(open_cur_ids)
+    n_at_risk = int((risk_cur.loc[list(open_cur_ids), "risk"] >= RISK_THRESHOLD).sum()) if n_open else 0
+    avg_risk = float(risk_cur.loc[list(open_cur_ids), "risk"].mean()) if n_open else 0.0
+
+    n_open_prev = len(open_prev_ids)
+    n_at_risk_prev = int((risk_prev.loc[list(open_prev_ids), "risk"] >= RISK_THRESHOLD).sum()) if n_open_prev else 0
+    avg_risk_prev = float(risk_prev.loc[list(open_prev_ids), "risk"].mean()) if n_open_prev else 0.0
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Open issues", n_open, f"{n_open - n_open_prev:+d} vs. last step")
+    m2.metric("At-risk (>0.5)", n_at_risk, f"{n_at_risk - n_at_risk_prev:+d} newly at risk" if n_at_risk != n_at_risk_prev else "no change")
+    m3.metric("Average risk", f"{avg_risk:.0%}", f"{avg_risk - avg_risk_prev:+.0%} vs. last step")
+
+    # --- Scoreboard (stateless: purely a function of T) ---
+    resolved_so_far = mc_issues[mc_issues["Resolution_Date"] <= T]
+    if len(resolved_so_far):
+        rs_risk = dd.risk_at_time(mc_issues, mc_checkpoints, T).set_index("ID")
+        rs_risk_sub = rs_risk.loc[resolved_so_far["ID"]]
+        predicted_delayed = rs_risk_sub["risk"] >= RISK_THRESHOLD
+        actual_delayed = resolved_so_far.set_index("ID")["delayed_v2"].astype(bool)
+        correct = (predicted_delayed.values == actual_delayed.values).sum()
+        st.info(f"📊 **Running scoreboard:** {correct} / {len(resolved_so_far)} resolved issues so far "
+                f"correctly called ({correct/len(resolved_so_far):.0%} accuracy).")
+
+    # --- Event feed ---
+    st.subheader("Event feed")
+    events = []
+    newly_created = mc_issues[(mc_issues["Creation_Date"] > T_prev) & (mc_issues["Creation_Date"] <= T)]
+    for _, iss in newly_created.iterrows():
+        r = risk_cur.loc[iss["ID"], "risk"] if iss["ID"] in risk_cur.index else iss["static_risk"]
+        events.append((iss["Creation_Date"], f"🆕 Issue {int(iss['ID'])} created -- initial risk {r:.0%}"))
+
+    resolved_between = mc_issues[(mc_issues["Resolution_Date"] > T_prev) & (mc_issues["Resolution_Date"] <= T)]
+    for _, iss in resolved_between.iterrows():
+        r = risk_cur.loc[iss["ID"], "risk"] if iss["ID"] in risk_cur.index else iss["static_risk"]
+        was_delayed = bool(iss["delayed_v2"])
+        predicted_delay = r >= RISK_THRESHOLD
+        correct = predicted_delay == was_delayed
+        outcome = "delayed" if was_delayed else "on time"
+        mark = "✅ correct call" if correct else "❌ missed call"
+        icon = "🔴" if was_delayed else "✅"
+        events.append((iss["Resolution_Date"],
+                       f"{icon} Issue {int(iss['ID'])} resolved -- {outcome}, predicted {r:.0%} ({mark})"))
+
+    common_open = open_prev_ids & open_cur_ids
+    if common_open:
+        prev_bands = risk_prev.loc[list(common_open), "risk"].apply(dd.risk_band)
+        cur_bands = risk_cur.loc[list(common_open), "risk"].apply(dd.risk_band)
+        changed = prev_bands[prev_bands != cur_bands]
+        rank = {"low": 0, "medium": 1, "high": 2}
+        for iid in changed.index:
+            old_r, new_r = risk_prev.loc[iid, "risk"], risk_cur.loc[iid, "risk"]
+            direction = "⚠️" if rank[cur_bands[iid]] > rank[prev_bands[iid]] else "⬇️"
+            verb = "crossed into higher risk" if rank[cur_bands[iid]] > rank[prev_bands[iid]] else "dropped to lower risk"
+            events.append((T, f"{direction} Issue {int(iid)} {verb} ({old_r:.0%} → {new_r:.0%})"))
+
+    events.sort(key=lambda e: e[0], reverse=True)
+    if events:
+        for _, msg in events[:25]:
+            st.write(msg)
+        if len(events) > 25:
+            st.caption(f"... and {len(events) - 25} more events this step.")
+    else:
+        st.caption("No events in this step.")
+
+    # --- Open issues table ---
+    st.subheader("Open issues, sorted by risk")
+    if n_open:
+        open_df = mc_issues[mc_issues["ID"].isin(open_cur_ids)].merge(
+            risk_cur.reset_index()[["ID", "risk", "source"]], on="ID", how="left"
+        ).sort_values("risk", ascending=False)
+        display_mc = open_df[["ID", "Title", "Type", "Priority", "Assignee_ID", "risk", "source"]].rename(
+            columns={"risk": "predicted_risk"}
+        ).reset_index(drop=True)
+        styled_mc = display_mc.style.map(
+            lambda v: f"background-color:{dd.risk_color(v)}33;color:{dd.risk_color(v)};font-weight:600;",
+            subset=["predicted_risk"],
+        ).format({"predicted_risk": "{:.0%}"})
+        st.dataframe(styled_mc, width="stretch", height=350)
+    else:
+        st.caption("No open issues at this date.")
+
+    # --- Project timeline ---
+    st.subheader("Open-issue volume over time (by risk band)")
+    timeline = get_mission_control_timeline(MC_PROJECT, mc_issues, mc_checkpoints, MC_START, MC_END)
+    fig, ax = plt.subplots(figsize=(11, 3.2))
+    ax.stackplot(timeline["date"], timeline["low"], timeline["medium"], timeline["high"],
+                 colors=[GREEN, AMBER, RED], alpha=0.6, labels=["Low", "Medium", "High"])
+    ax.axvline(T, color="black", linewidth=1.5, linestyle="--")
+    ax.set_ylabel("Open issues", fontsize=11)
+    ax.legend(fontsize=9, loc="upper left")
+    ax.tick_params(labelsize=9)
     st.pyplot(fig, clear_figure=True)
 
-    st.subheader("Top-risk issues")
-    top_n = st.slider("Show top N highest-risk issues", 5, 50, 15, key="tab1_topn")
-    top_risk = proj_df.sort_values("dynamic_risk", ascending=False).head(top_n)
-    display_df = top_risk[["ID", "Title", "Type", "Priority", "Assignee_ID", "dynamic_risk", "checkpoint_index"]].rename(
-        columns={"dynamic_risk": "predicted_risk"}
-    ).reset_index(drop=True)
-
-    def _style_risk(v):
-        return f"background-color: {dd.risk_color(v)}33; color: {dd.risk_color(v)}; font-weight: 600;"
-
-    styled = display_df.style.map(_style_risk, subset=["predicted_risk"]).format({"predicted_risk": "{:.0%}"})
-    st.dataframe(styled, width="stretch")
+    if playing and T < MC_END:
+        time.sleep(0.7)
+        st.session_state.mc_cursor = min(MC_END, T + step)
+        st.rerun()
+    elif playing and T >= MC_END:
+        st.session_state.mc_playing = False
 
 # ---------------------------------------------------------------------
 # Tab 2: Issue Risk & Explanation
@@ -197,9 +340,10 @@ with tab2:
         st.write(f"**Type:** {row['Type']}  |  **Priority:** {row['Priority']}  |  "
                  f"**Assignee:** {row['Assignee_ID']}  |  **Project:** {row['Project_ID']}")
 
-        # --- Risk trajectory chart (the headline visual) ---
+        # --- Risk trajectory chart with cohort band ---
         st.subheader("Risk trajectory across checkpoints")
         traj = dd.build_issue_trajectory(selected_id, row, all_checkpoints, dynamic_model)
+        cohort = ex.cohort_trajectories(all_checkpoints, feat_full, row["Project_ID"], row["Type_Normalized"], dynamic_model)
 
         if traj.empty:
             st.info("No checkpoint history available for this issue (resolved before M1).")
@@ -209,6 +353,11 @@ with tab2:
             ax.axhspan(0.4, 0.7, color=AMBER, alpha=0.06)
             ax.axhspan(0.7, 1.0, color=RED, alpha=0.06)
 
+            ax.fill_between(cohort["checkpoint_index"], cohort["q25"], cohort["q75"],
+                             color="#4C78A8", alpha=0.15, label=f"Cohort IQR (Project {row['Project_ID']}, {row['Type']})")
+            ax.plot(cohort["checkpoint_index"], cohort["median"], color="#4C78A8", linewidth=1.5,
+                    linestyle="--", alpha=0.7, label="Cohort median")
+
             max_ck = traj["checkpoint_index"].max()
             if max_ck >= 1:
                 ax.axvspan(1, min(2, max_ck), color="grey", alpha=0.15)
@@ -216,43 +365,35 @@ with tab2:
                         ha="center", va="bottom", color="#555555")
 
             ax.plot(traj["checkpoint_index"], traj["risk"], color="#eb6834", linewidth=2.4,
-                    marker="o", markersize=7, label="Dynamic predicted risk", zorder=5)
+                    marker="o", markersize=7, label="This issue (dynamic)", zorder=5)
             ax.axhline(row["static_risk"], color="#2a78d6", linestyle="--", linewidth=2,
-                       label=f"Static prediction (creation-time): {row['static_risk']:.0%}")
+                       label=f"Static prediction: {row['static_risk']:.0%}")
             ax.axhline(RISK_THRESHOLD, color="black", linestyle=":", linewidth=1.3,
                        label=f"Decision threshold ({RISK_THRESHOLD})")
             ax.axvline(CROSSOVER_CHECKPOINT, color="#54A24B", linestyle="-", linewidth=1.6, alpha=0.8)
-            ax.annotate(
-                "dynamic becomes more\nreliable than static from here",
-                xy=(CROSSOVER_CHECKPOINT, 0.95), fontsize=11, color="#2c6b3f",
-                ha="left", va="top",
-            )
+            ax.annotate("dynamic more reliable\nfrom here", xy=(CROSSOVER_CHECKPOINT, 0.95),
+                        fontsize=11, color="#2c6b3f", ha="left", va="top")
 
             actual_delayed = int(row["delayed_v2"])
             outcome_text = "DELAYED" if actual_delayed else "ON TIME"
             outcome_color = RED if actual_delayed else GREEN
             ax.scatter([max_ck], [traj.iloc[-1]["risk"]], s=140, facecolors="none",
                        edgecolors=outcome_color, linewidths=2.5, zorder=6)
-            ax.annotate(
-                f"Actual outcome: {outcome_text}",
-                xy=(max_ck, traj.iloc[-1]["risk"]), xytext=(-10, 20 if not actual_delayed else -30),
-                textcoords="offset points", fontsize=11, fontweight="bold", color=outcome_color,
-                ha="right",
-            )
+            ax.annotate(f"Actual outcome: {outcome_text}", xy=(max_ck, traj.iloc[-1]["risk"]),
+                        xytext=(-10, 20 if not actual_delayed else -30), textcoords="offset points",
+                        fontsize=11, fontweight="bold", color=outcome_color, ha="right")
 
             ax.set_xlabel("Checkpoint index (M1-M10)", fontsize=12)
             ax.set_ylabel("Predicted delay risk", fontsize=12)
             ax.set_xticks(range(1, 11))
             ax.set_ylim(-0.02, 1.05)
             ax.tick_params(labelsize=11)
-            ax.legend(fontsize=10, loc="lower right")
-            ax.set_title(f"Issue {selected_id}: risk trajectory", fontsize=13)
+            ax.legend(fontsize=9, loc="lower right")
+            ax.set_title(f"Issue {selected_id}: risk trajectory vs. cohort", fontsize=13)
             st.pyplot(fig, clear_figure=True)
 
-            first_risk = traj.iloc[0]["risk"]
-            first_ck = int(traj.iloc[0]["checkpoint_index"])
-            last_risk = traj.iloc[-1]["risk"]
             last_ck = int(traj.iloc[-1]["checkpoint_index"])
+            last_risk = traj.iloc[-1]["risk"]
             outcome_phrase = "It was ultimately delayed." if actual_delayed else "It ultimately finished on time."
             st.markdown(
                 f"*At creation this issue was predicted **{row['static_risk']:.0%}** likely to be delayed "
@@ -260,7 +401,8 @@ with tab2:
                 f"**{last_risk:.0%}**. {outcome_phrase}*"
             )
 
-        st.subheader("Why the model predicts this (at its latest checkpoint)")
+        # --- Grouped SHAP + NL explanation ---
+        st.subheader("Why the model predicts this")
         tree_explainer = ra._get_explainer(dynamic_model)
         row_features = row[dd.DYN_FEATURE_COLS].to_frame().T
         for col in dd.DYN_FEATURE_COLS:
@@ -269,31 +411,97 @@ with tab2:
             else:
                 row_features[col] = row_features[col].astype(float)
         shap_values = tree_explainer(row_features[dd.DYN_FEATURE_COLS])
+        contrib = pd.Series(shap_values.values[0], index=dd.DYN_FEATURE_COLS)
+        grouped = ex.grouped_shap(contrib)
 
-        fig2 = plt.figure(figsize=(8, 5))
-        shap.plots.waterfall(shap_values[0], show=False)
-        st.pyplot(fig2, clear_figure=True)
+        fig_g, ax_g = plt.subplots(figsize=(8, 3.5))
+        order = grouped.index[::-1]
+        colors_g = ["#c0392b" if v > 0 else "#1b8a5a" for v in grouped.loc[order]]
+        ax_g.barh(order, grouped.loc[order], color=colors_g)
+        ax_g.axvline(0, color="grey", linewidth=1)
+        ax_g.set_xlabel("SHAP contribution to risk", fontsize=11)
+        ax_g.tick_params(labelsize=10)
+        st.pyplot(fig_g, clear_figure=True)
 
-        contrib = pd.Series(shap_values.values[0], index=dd.DYN_FEATURE_COLS).sort_values(
-            key=abs, ascending=False
+        status_row = checkpoint_status[
+            (checkpoint_status["Issue_ID"] == selected_id)
+            & (checkpoint_status["checkpoint_index"] == row["checkpoint_index"])
+        ]
+        current_status = status_row["current_status"].iloc[0] if len(status_row) else None
+        last_change = status_row["last_status_change_time"].iloc[0] if len(status_row) else None
+        checkpoint_time = row["Creation_Date"] + pd.Timedelta(minutes=row["elapsed_minutes"])
+        avg_delay_rate = ex.project_avg_delay_rate(feat_full, row["Project_ID"])
+
+        bullets = ex.generate_explanation(
+            row, contrib, ref_stats, avg_delay_rate,
+            current_status=current_status, last_status_change_time=last_change, checkpoint_time=checkpoint_time,
         )
-        top3 = contrib.head(3)
-        direction = lambda v: "increases" if v > 0 else "decreases"
-        plain = "; ".join(f"**{f}** {direction(v)} risk" for f, v in top3.items())
-        st.markdown(f"In plain language: {plain}.")
+        st.markdown(f"**Why this issue is flagged ({row['dynamic_risk']:.0%} risk):**")
+        for b in bullets:
+            st.markdown(f"- {b}")
+
+        # --- Peer comparison ---
+        st.subheader("Peer comparison")
+        peer_times = ex.peer_resolution_times(feat_full, row["Project_ID"], row["Type_Normalized"], row["Priority_Normalized"])
+        if len(peer_times) >= 5:
+            elapsed_days = row["elapsed_minutes"] / 1440
+            fig_p, ax_p = plt.subplots(figsize=(8, 3))
+            ax_p.hist(peer_times, bins=30, color="#4C78A8", alpha=0.7, edgecolor="white")
+            ax_p.axvline(elapsed_days, color="#eb6834", linewidth=2.5,
+                         label=f"This issue: day {elapsed_days:.1f}")
+            pct = (peer_times < elapsed_days).mean()
+            ax_p.set_xlabel("Resolution time (days)", fontsize=11)
+            ax_p.set_ylabel("Peer issue count", fontsize=11)
+            ax_p.legend(fontsize=9)
+            st.pyplot(fig_p, clear_figure=True)
+            st.caption(
+                f"This issue has already taken longer than **{pct:.0%}** of {len(peer_times)} peer issues "
+                f"(same project, type, and priority) took to resolve in total."
+            )
+        else:
+            st.caption("Not enough peer issues (same project/type/priority) for a meaningful comparison.")
+
+        # --- What-if controls ---
+        st.subheader("What if...")
+        wcol1, wcol2, wcol3 = st.columns(3)
+        with wcol1:
+            what_if_concurrent = st.slider("Assignee concurrent open issues", 0, 60,
+                                            int(row["assignee_concurrent_open"]), key="wi_concurrent")
+        with wcol2:
+            what_if_delay_rate = st.slider("Assignee historical delay rate", 0.0, 1.0,
+                                            float(row["assignee_prior_delay_rate"]) if pd.notna(row["assignee_prior_delay_rate"]) else 0.5,
+                                            key="wi_delay_rate")
+        with wcol3:
+            priority_options = sorted(portfolio["Priority_Normalized"].cat.categories.tolist())
+            what_if_priority = st.selectbox("Priority", priority_options,
+                                             index=priority_options.index(row["Priority_Normalized"]),
+                                             key="wi_priority")
+
+        what_if_row = row_features.copy()
+        what_if_row["assignee_concurrent_open"] = float(what_if_concurrent)
+        what_if_row["assignee_prior_delay_rate"] = float(what_if_delay_rate)
+        what_if_row["Priority_Normalized"] = pd.Categorical([what_if_priority], categories=priority_options)
+        what_if_risk = float(dynamic_model.predict_proba(what_if_row[dd.DYN_FEATURE_COLS])[:, 1][0])
+
+        wcol_result1, wcol_result2 = st.columns(2)
+        wcol_result1.metric("Original predicted risk", f"{row['dynamic_risk']:.0%}")
+        wcol_result2.metric("What-if predicted risk", f"{what_if_risk:.0%}",
+                            f"{what_if_risk - row['dynamic_risk']:+.0%}")
 
 # ---------------------------------------------------------------------
-# Tab 3: Team Workload
+# Tab 3: Team (workload table + heatmap)
 # ---------------------------------------------------------------------
 with tab3:
-    st.header("Team Workload")
+    st.header("Team")
+    projects = sorted(portfolio["Project_ID"].unique())
     project_id_3 = st.selectbox("Project", projects, key="tab3_project")
 
     proj_issues = feat_full[feat_full["Project_ID"] == project_id_3].dropna(subset=["Assignee_ID"])
     proj_issues = proj_issues.sort_values("Creation_Date")
+
+    st.subheader("Current workload snapshot")
     latest_per_dev = proj_issues.groupby("Assignee_ID", as_index=False).tail(1)
     latest_per_dev = latest_per_dev.sort_values("assignee_concurrent_open", ascending=False)
-
     st.caption(
         "Each developer's most recently observed concurrent-open-issue count and historical "
         "delay rate, as of their latest issue in this project -- this is exactly the workload "
@@ -305,12 +513,37 @@ with tab3:
         "assignee_prior_delay_rate": "historical_delay_rate",
         "assignee_prior_resolved_count": "prior_resolved_count",
     }).reset_index(drop=True)
-
     styled_workload = workload_df.style.map(
         lambda v: f"background-color: {dd.risk_color(v)}33; color: {dd.risk_color(v)}; font-weight: 600;",
         subset=["historical_delay_rate"],
     ).format({"historical_delay_rate": "{:.0%}"})
     st.dataframe(styled_workload, width="stretch")
+
+    st.subheader("Team heatmap: average risk by developer and month")
+    st.caption(
+        "Simplification, stated plainly: this buckets issues by the MONTH THEY WERE CREATED (not a "
+        "true day-by-day open-issues average, which Mission Control provides for one project/window) "
+        "-- cell = average predicted risk (at each issue's last observed checkpoint) of issues that "
+        "developer created in that month."
+    )
+    proj_scored = portfolio[portfolio["Project_ID"] == project_id_3].copy()
+    if len(proj_scored):
+        proj_scored["month"] = proj_scored["Creation_Date"].dt.to_period("M").astype(str)
+        pivot = proj_scored.pivot_table(index="Assignee_ID", columns="month", values="dynamic_risk", aggfunc="mean")
+        pivot = pivot.loc[pivot.mean(axis=1).sort_values(ascending=False).index]
+        if pivot.shape[0] > 0 and pivot.shape[1] > 0:
+            fig_h, ax_h = plt.subplots(figsize=(min(14, 1 + 0.6 * pivot.shape[1]), max(2.5, 0.35 * pivot.shape[0])))
+            im = ax_h.imshow(pivot.values, cmap="RdYlGn_r", vmin=0, vmax=1, aspect="auto")
+            ax_h.set_xticks(range(pivot.shape[1]))
+            ax_h.set_xticklabels(pivot.columns, rotation=45, ha="right", fontsize=8)
+            ax_h.set_yticks(range(pivot.shape[0]))
+            ax_h.set_yticklabels([str(int(a)) for a in pivot.index], fontsize=8)
+            fig_h.colorbar(im, ax=ax_h, label="Average predicted risk", shrink=0.8)
+            st.pyplot(fig_h, clear_figure=True)
+        else:
+            st.caption("Not enough data for a heatmap in this project's test-portfolio slice.")
+    else:
+        st.caption("No portfolio issues for this project.")
 
 # ---------------------------------------------------------------------
 # Tab 4: Reassignment Suggester
