@@ -53,17 +53,27 @@ def _candidate_snapshot_features(feat_full, project_id, assignee_id):
     return {col: latest[col] for col in dd.ASSIGNEE_FEATURE_COLS}
 
 
-def suggest_reassignment(issue_id, portfolio, feat_full, dynamic_model, top_n=5):
+def suggest_reassignment(issue_id, portfolio, feat_full, dynamic_model, top_n=5,
+                          model=None, feature_cols=None, model_label=None):
     """
+    model/feature_cols: override which model scores the candidates. Defaults
+    to the dynamic model + DYN_FEATURE_COLS (the original behavior). Pass the
+    static model + STATIC_FEATURE_COLS_V2 for issues below the M3 reliability
+    threshold, consistent with the source logic used elsewhere (risk_at_time).
+    model_label: optional string echoed back in the result for display.
+
     Returns a dict:
       {
-        "issue_id", "current_assignee_id", "current_risk",
+        "issue_id", "current_assignee_id", "current_risk", "model_label",
         "verdict": "reassignment_may_help" | "reassignment_unlikely_to_help",
         "top_drivers": [(feature, shap_value), ...],
         "candidate_pool_threshold": int,
         "candidates": [ {assignee_id, predicted_risk, risk_delta}, ... ]  # empty if verdict says unlikely to help
       }
     """
+    model = model if model is not None else dynamic_model
+    feature_cols = feature_cols if feature_cols is not None else dd.DYN_FEATURE_COLS
+
     row = portfolio[portfolio["ID"] == issue_id]
     if row.empty:
         raise ValueError(f"issue_id {issue_id} not found in the current portfolio")
@@ -71,18 +81,19 @@ def suggest_reassignment(issue_id, portfolio, feat_full, dynamic_model, top_n=5)
 
     project_id = row["Project_ID"]
     current_assignee = row["Assignee_ID"]
-    current_features = row[dd.DYN_FEATURE_COLS].to_frame().T
-    for col in dd.CATEGORICAL_COLS + ["pattern_label"]:
-        current_features[col] = current_features[col].astype(portfolio[col].dtype)
-    for col in dd.STATIC_FEATURE_COLS_V2 + ["log1p_stall", "elapsed_minutes"]:
-        current_features[col] = current_features[col].astype(float) if col not in dd.CATEGORICAL_COLS else current_features[col]
+    current_features = row[feature_cols].to_frame().T
+    for col in feature_cols:
+        if col in dd.CATEGORICAL_COLS + ["pattern_label"]:
+            current_features[col] = current_features[col].astype(portfolio[col].dtype)
+        else:
+            current_features[col] = current_features[col].astype(float)
 
-    current_risk = float(dynamic_model.predict_proba(current_features[dd.DYN_FEATURE_COLS])[:, 1][0])
+    current_risk = float(model.predict_proba(current_features[feature_cols])[:, 1][0])
 
     # --- Honesty check: SHAP under the current assignee ---
-    explainer = _get_explainer(dynamic_model)
-    shap_values = explainer(current_features[dd.DYN_FEATURE_COLS])
-    contrib = pd.Series(shap_values.values[0], index=dd.DYN_FEATURE_COLS)
+    explainer = _get_explainer(model)
+    shap_values = explainer(current_features[feature_cols])
+    contrib = pd.Series(shap_values.values[0], index=feature_cols)
     contrib_abs_sorted = contrib.abs().sort_values(ascending=False)
     top_features = contrib_abs_sorted.head(TOP_K_DRIVERS).index.tolist()
     top_drivers = [(f, float(contrib[f])) for f in top_features]
@@ -94,6 +105,7 @@ def suggest_reassignment(issue_id, portfolio, feat_full, dynamic_model, top_n=5)
         "issue_id": issue_id,
         "current_assignee_id": current_assignee,
         "current_risk": current_risk,
+        "model_label": model_label,
         "top_drivers": top_drivers,
         "candidate_pool_threshold": None,
         "candidates": [],
@@ -129,7 +141,7 @@ def suggest_reassignment(issue_id, portfolio, feat_full, dynamic_model, top_n=5)
         for col, val in snapshot.items():
             cand_features[col] = float(val)
         cand_features["is_unassigned"] = 0.0
-        cand_risk = float(dynamic_model.predict_proba(cand_features[dd.DYN_FEATURE_COLS])[:, 1][0])
+        cand_risk = float(model.predict_proba(cand_features[feature_cols])[:, 1][0])
         scored_candidates.append({
             "assignee_id": cand_id,
             "predicted_risk": cand_risk,

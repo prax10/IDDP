@@ -1,5 +1,5 @@
 """
-Phase 12 (+ Task D "Mission Control"): Streamlit prototype. Demo wrapper
+Intelligent Dynamic Delay Prediction -- Streamlit prototype. Demo wrapper
 around already-final models -- no retraining, no live Jira sync, no task
 editing, no notifications. Mission Control replays REAL historical data
 with real leakage-safe predictions -- it is a replay, not a live feed,
@@ -25,7 +25,8 @@ import reassignment as ra
 import reference_stats as rs
 import explain as ex
 
-st.set_page_config(page_title="TAWOS Delay Risk", layout="wide", page_icon="🚦")
+APP_NAME = "Intelligent Dynamic Delay Prediction"
+st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🚦")
 
 RISK_THRESHOLD = dd.DEFAULT_THRESHOLD  # 0.5, stated in the UI
 CROSSOVER_CHECKPOINT = dd.CROSSOVER_CHECKPOINT  # M3
@@ -36,6 +37,7 @@ DYNAMIC_M10_AUC = 0.859
 MC_PROJECT = dd.MISSION_CONTROL_PROJECT
 MC_START = dd.MISSION_CONTROL_START
 MC_END = dd.MISSION_CONTROL_END
+MC_DEFAULT_START = MC_START + (MC_END - MC_START) / 3  # Step 5: open mid-window, not dead-on-arrival
 
 
 def risk_badge(risk):
@@ -43,6 +45,20 @@ def risk_badge(risk):
     color = dd.RISK_COLORS[band]
     label = {"low": "On track", "medium": "Watch", "high": "At risk"}[band]
     return f'<span style="color:{color}; font-weight:600;">{label} ({risk:.0%})</span>'
+
+
+def fmt_int(x):
+    """Step 8: whole numbers, no decimals -- for IDs, counts."""
+    return "" if pd.isna(x) else f"{int(round(x))}"
+
+
+def fmt_num(x, places=2):
+    """Step 8: non-integers to at most `places` decimals."""
+    if pd.isna(x):
+        return ""
+    if float(x) == int(x):
+        return f"{int(x)}"
+    return f"{x:.{places}f}"
 
 
 @st.cache_resource
@@ -92,17 +108,24 @@ def get_mission_control_data(project_id, _static_model, _dynamic_model):
 
 
 @st.cache_data
+def get_blocking_graph(project_id, issue_ids):
+    return dd.load_blocking_graph(project_id, issue_ids)
+
+
+@st.cache_data
 def get_mission_control_timeline(project_id, issues, checkpoints, start, end):
     dates = pd.date_range(start, end, freq="D")
     rows = []
     for d in dates:
-        risk_df = dd.risk_at_time(issues, checkpoints, d)
+        cls = dd.classify_at_time(issues, checkpoints, d)
         open_mask = dd.open_at_time(issues, d)
-        open_risk = risk_df[risk_df["ID"].isin(issues.loc[open_mask, "ID"])]
-        bands = open_risk["risk"].apply(dd.risk_band).value_counts()
+        open_cls = cls[cls["ID"].isin(issues.loc[open_mask, "ID"])]
+        counts = open_cls["status"].value_counts()
         rows.append({
             "date": d,
-            "low": bands.get("low", 0), "medium": bands.get("medium", 0), "high": bands.get("high", 0),
+            "on_track": counts.get("on_track", 0),
+            "at_risk": counts.get("at_risk", 0),
+            "overrunning": counts.get("overrunning", 0),
         })
     return pd.DataFrame(rows)
 
@@ -115,7 +138,7 @@ portfolio["at_risk"] = portfolio["dynamic_risk"] >= RISK_THRESHOLD
 all_checkpoints = get_all_checkpoints()
 checkpoint_status = get_checkpoints_with_status()
 
-st.title("TAWOS Issue Delay Risk")
+st.title(APP_NAME)
 st.caption(
     f"XGBoost · trained on 203,290 resolved issues across 39 projects · "
     f"AUC {STATIC_TEST_AUC:.3f} static / {DYNAMIC_M10_AUC:.3f} dynamic at M10"
@@ -136,6 +159,10 @@ with st.expander("How it works", expanded=False):
   has elapsed (checkpoint M3)** -- confirmed via bootstrap confidence intervals. Mission Control and
   the trajectory chart both enforce this rule directly: before M3 you see the static estimate,
   labelled as such.
+- **Overrunning vs. at risk (Mission Control):** an issue that has already exceeded its own expected
+  duration is a **fact**, not a forecast -- it's tracked separately from the genuine at-risk/on-track
+  prediction queue. We call this "overrunning" or "past expected duration," never "past deadline" --
+  TAWOS has no deadline field, nothing in the data represents a commitment.
 - **Decision threshold:** **{RISK_THRESHOLD}** for at-risk/on-track calls; {dd.F1_THRESHOLD} was
   separately tuned to optimize F1 if that's the operating point you care about.
 - **Risk colour coding (used everywhere):**
@@ -146,93 +173,173 @@ with st.expander("How it works", expanded=False):
   model would genuinely have predicted, day by day, using only information available as of each
   date shown -- no data has been fabricated or simulated. The window (Project {MC_PROJECT},
   {MC_START.date()} to {MC_END.date()}) falls entirely within the model's held-out test period.
+- **Blocking relationships:** Project {MC_PROJECT} records directed link types ("depends on" /
+  "has to be done before" and equivalents) that let us tell which issue blocks which -- verified
+  directional and reciprocal in the raw data, not inferred from keyword guesses.
 - **Other tabs' data note:** outside Mission Control, the app uses held-out (test-split) resolved
   issues at their last observed checkpoint as a stand-in "current" portfolio, since there is no
   live feed of in-progress issues with computed features in this project.
 """, unsafe_allow_html=True)
 
-tab_mc, tab2, tab3, tab4 = st.tabs(
-    ["🎛️ Mission Control", "Issue Risk & Explanation", "Team", "Reassignment Suggester"]
-)
+tab_mc, tab2, tab3 = st.tabs(["🎛️ Mission Control", "Issue Risk & Explanation", "Team"])
 
 # ---------------------------------------------------------------------
 # Tab: Mission Control (time-travel replay)
 # ---------------------------------------------------------------------
 with tab_mc:
-    st.header("Mission Control -- historical replay")
-    st.caption(
-        f"Replaying **Project {MC_PROJECT}**, {MC_START.date()} to {MC_END.date()} -- real historical "
-        f"issues, real leakage-safe predictions, no simulated data. This window falls entirely within "
-        f"the model's held-out test period."
-    )
-
     mc_issues, mc_checkpoints = get_mission_control_data(MC_PROJECT, static_model, dynamic_model)
+    blocking_graph = get_blocking_graph(MC_PROJECT, tuple(mc_issues["ID"]))
 
     if "mc_cursor" not in st.session_state:
-        st.session_state.mc_cursor = MC_START
+        st.session_state.mc_cursor = MC_DEFAULT_START
     if "mc_playing" not in st.session_state:
         st.session_state.mc_playing = False
+    if "mc_step" not in st.session_state:
+        st.session_state.mc_step = "1 week"
 
-    col_a, col_b, col_c = st.columns([2, 1, 1])
+    # --- Step 2: sticky context header (always visible, reflects state
+    # BEFORE this run's widgets are drawn -- Streamlit already updated
+    # session_state by the time the script re-executes, so this is current) ---
+    st.markdown(
+        f"""
+        <div style="position: sticky; top: 0; z-index: 999; background-color: rgba(240,240,240,0.97);
+                    padding: 10px 14px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 10px;
+                    font-size: 1.05rem;">
+        🎛️ <b>Mission Control</b> &nbsp;·&nbsp; Project <b>{MC_PROJECT}</b>
+        &nbsp;·&nbsp; Replay date: <b>{pd.Timestamp(st.session_state.mc_cursor).date()}</b>
+        &nbsp;·&nbsp; Step: <b>{st.session_state.mc_step}</b>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        f"Replaying real historical issues with real leakage-safe predictions -- this window falls "
+        f"entirely within the model's held-out test period, not a live feed."
+    )
+
+    col_a, col_b, col_c, col_d = st.columns([2, 1, 1, 1])
     with col_a:
         cursor_date = st.slider(
             "Replay date", min_value=MC_START.to_pydatetime(), max_value=MC_END.to_pydatetime(),
-            value=st.session_state.mc_cursor.to_pydatetime(), format="YYYY-MM-DD", key="mc_slider",
+            value=pd.Timestamp(st.session_state.mc_cursor).to_pydatetime(), format="YYYY-MM-DD", key="mc_slider",
         )
         st.session_state.mc_cursor = pd.Timestamp(cursor_date)
     with col_b:
-        step_label = st.selectbox("Step size", ["1 day", "1 week"], index=1, key="mc_step")
+        step_label = st.selectbox("Step size", ["1 day", "1 week"],
+                                   index=["1 day", "1 week"].index(st.session_state.mc_step), key="mc_step_select")
+        st.session_state.mc_step = step_label
         step = pd.Timedelta(days=1) if step_label == "1 day" else pd.Timedelta(weeks=1)
     with col_c:
         playing = st.checkbox("▶ Play", value=st.session_state.mc_playing, key="mc_play_checkbox")
         st.session_state.mc_playing = playing
+    with col_d:
+        if st.button("⟲ Reset to start"):
+            st.session_state.mc_cursor = MC_START
+            st.session_state.mc_playing = False
+            st.rerun()
 
     T = st.session_state.mc_cursor
     T_prev = max(MC_START, T - step)
 
-    risk_cur = dd.risk_at_time(mc_issues, mc_checkpoints, T).set_index("ID")
-    risk_prev = dd.risk_at_time(mc_issues, mc_checkpoints, T_prev).set_index("ID")
+    cls_cur = dd.classify_at_time(mc_issues, mc_checkpoints, T).set_index("ID")
+    cls_prev = dd.classify_at_time(mc_issues, mc_checkpoints, T_prev).set_index("ID")
     open_cur_mask = dd.open_at_time(mc_issues, T)
     open_prev_mask = dd.open_at_time(mc_issues, T_prev)
 
     open_cur_ids = set(mc_issues.loc[open_cur_mask, "ID"])
     open_prev_ids = set(mc_issues.loc[open_prev_mask, "ID"])
 
-    n_open = len(open_cur_ids)
-    n_at_risk = int((risk_cur.loc[list(open_cur_ids), "risk"] >= RISK_THRESHOLD).sum()) if n_open else 0
-    avg_risk = float(risk_cur.loc[list(open_cur_ids), "risk"].mean()) if n_open else 0.0
+    def _counts(cls, ids):
+        if not ids:
+            return {"overrunning": 0, "at_risk": 0, "on_track": 0}
+        sub = cls.loc[list(ids), "status"].value_counts()
+        return {k: int(sub.get(k, 0)) for k in ["overrunning", "at_risk", "on_track"]}
 
-    n_open_prev = len(open_prev_ids)
-    n_at_risk_prev = int((risk_prev.loc[list(open_prev_ids), "risk"] >= RISK_THRESHOLD).sum()) if n_open_prev else 0
-    avg_risk_prev = float(risk_prev.loc[list(open_prev_ids), "risk"].mean()) if n_open_prev else 0.0
+    cur_counts = _counts(cls_cur, open_cur_ids)
+    prev_counts = _counts(cls_prev, open_prev_ids)
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Open issues", n_open, f"{n_open - n_open_prev:+d} vs. last step")
-    m2.metric("At-risk (>0.5)", n_at_risk, f"{n_at_risk - n_at_risk_prev:+d} newly at risk" if n_at_risk != n_at_risk_prev else "no change")
-    m3.metric("Average risk", f"{avg_risk:.0%}", f"{avg_risk - avg_risk_prev:+.0%} vs. last step")
+    non_overrun_cur = [i for i in open_cur_ids if cls_cur.loc[i, "status"] != "overrunning"]
+    non_overrun_prev = [i for i in open_prev_ids if cls_prev.loc[i, "status"] != "overrunning"]
+    avg_risk = float(cls_cur.loc[non_overrun_cur, "risk"].mean()) if non_overrun_cur else float("nan")
+    avg_risk_prev = float(cls_prev.loc[non_overrun_prev, "risk"].mean()) if non_overrun_prev else float("nan")
 
-    # --- Scoreboard (stateless: purely a function of T) ---
-    resolved_so_far = mc_issues[mc_issues["Resolution_Date"] <= T]
+    # --- Step 1: 5 metric cards, Overrunning split out ---
+    n_open, n_open_prev = len(open_cur_ids), len(open_prev_ids)
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Open", n_open, f"{n_open - n_open_prev:+d} vs. last step")
+    m2.metric("Overrunning", cur_counts["overrunning"],
+              f"{cur_counts['overrunning'] - prev_counts['overrunning']:+d} vs. last step")
+    m3.metric("At risk", cur_counts["at_risk"],
+              f"{cur_counts['at_risk'] - prev_counts['at_risk']:+d} vs. last step")
+    m4.metric("On track", cur_counts["on_track"],
+              f"{cur_counts['on_track'] - prev_counts['on_track']:+d} vs. last step")
+    avg_delta = (avg_risk - avg_risk_prev) if not (np.isnan(avg_risk) or np.isnan(avg_risk_prev)) else 0.0
+    m5.metric("Avg risk (excl. overrunning)", f"{avg_risk:.0%}" if not np.isnan(avg_risk) else "n/a",
+              f"{avg_delta:+.0%} vs. last step")
+    st.caption(
+        "Overrunning issues (already past their own expected duration) are excluded from the "
+        "average and tracked separately below -- they're a fact about the past, not a prediction."
+    )
+
+    # --- Step 4: fixed running scoreboard (only within-replay resolutions) ---
+    resolved_so_far = mc_issues[(mc_issues["Resolution_Date"] > MC_START) & (mc_issues["Resolution_Date"] <= T)]
     if len(resolved_so_far):
         rs_risk = dd.risk_at_time(mc_issues, mc_checkpoints, T).set_index("ID")
         rs_risk_sub = rs_risk.loc[resolved_so_far["ID"]]
         predicted_delayed = rs_risk_sub["risk"] >= RISK_THRESHOLD
         actual_delayed = resolved_so_far.set_index("ID")["delayed_v2"].astype(bool)
-        correct = (predicted_delayed.values == actual_delayed.values).sum()
-        st.info(f"📊 **Running scoreboard:** {correct} / {len(resolved_so_far)} resolved issues so far "
-                f"correctly called ({correct/len(resolved_so_far):.0%} accuracy).")
+        correct = int((predicted_delayed.values == actual_delayed.values).sum())
+        majority_class = int(actual_delayed.mean() >= 0.5)
+        majority_correct = int((actual_delayed.values == bool(majority_class)).sum())
+        st.info(
+            f"📊 **Running scoreboard (since {MC_START.date()}):** {correct} / {len(resolved_so_far)} "
+            f"resolved issues correctly called ({correct/len(resolved_so_far):.0%} accuracy) · "
+            f"predicting '{'delayed' if majority_class else 'on time'}' for everything would score "
+            f"{majority_correct/len(resolved_so_far):.0%}."
+        )
+    else:
+        st.caption("📊 Running scoreboard: no issues resolved yet since the replay start.")
 
-    # --- Event feed ---
+    # --- Step 3: blocker cascade among overrunning issues ---
+    st.subheader("⛓️ Blocker cascade -- overrunning issues holding up other work")
+    overrunning_ids = [i for i in open_cur_ids if cls_cur.loc[i, "status"] == "overrunning"]
+    cascade_rows = []
+    for oid in overrunning_ids:
+        blocked = [b for b in blocking_graph.get(oid, []) if b in open_cur_ids]
+        if blocked:
+            cascade_rows.append((oid, blocked))
+    cascade_rows.sort(key=lambda r: -len(r[1]))
+
+    if cascade_rows:
+        title_lookup = mc_issues.set_index("ID")["Title"]
+        overrun_lookup = cls_cur["overrun_multiple"]
+        for oid, blocked in cascade_rows[:5]:
+            mult = overrun_lookup.get(oid, float("nan"))
+            st.markdown(
+                f"🔴 **Issue {fmt_int(oid)}** -- *{title_lookup.get(oid, '')[:70]}* "
+                f"({mult:.1f}x expected duration) blocks **{len(blocked)}** open issue(s):"
+            )
+            for b in blocked:
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;↳ Issue {fmt_int(b)} -- *{title_lookup.get(b, '')[:60]}*",
+                            unsafe_allow_html=True)
+    else:
+        st.caption("No overrunning issue currently blocks another open issue in this window.")
+
+    # --- Event feed (Step 5: filtered to significant changes) ---
     st.subheader("Event feed")
     events = []
+    risk_cur_all = cls_cur["risk"]
+    risk_prev_all = cls_prev["risk"]
+
     newly_created = mc_issues[(mc_issues["Creation_Date"] > T_prev) & (mc_issues["Creation_Date"] <= T)]
     for _, iss in newly_created.iterrows():
-        r = risk_cur.loc[iss["ID"], "risk"] if iss["ID"] in risk_cur.index else iss["static_risk"]
-        events.append((iss["Creation_Date"], f"🆕 Issue {int(iss['ID'])} created -- initial risk {r:.0%}"))
+        r = risk_cur_all.get(iss["ID"], iss["static_risk"])
+        if r >= RISK_THRESHOLD:  # only NEW HIGH-risk issues are signal
+            events.append((iss["Creation_Date"], f"🆕 Issue {fmt_int(iss['ID'])} created -- initial risk {r:.0%}"))
 
     resolved_between = mc_issues[(mc_issues["Resolution_Date"] > T_prev) & (mc_issues["Resolution_Date"] <= T)]
     for _, iss in resolved_between.iterrows():
-        r = risk_cur.loc[iss["ID"], "risk"] if iss["ID"] in risk_cur.index else iss["static_risk"]
+        r = risk_cur_all.get(iss["ID"], iss["static_risk"])
         was_delayed = bool(iss["delayed_v2"])
         predicted_delay = r >= RISK_THRESHOLD
         correct = predicted_delay == was_delayed
@@ -240,38 +347,43 @@ with tab_mc:
         mark = "✅ correct call" if correct else "❌ missed call"
         icon = "🔴" if was_delayed else "✅"
         events.append((iss["Resolution_Date"],
-                       f"{icon} Issue {int(iss['ID'])} resolved -- {outcome}, predicted {r:.0%} ({mark})"))
+                       f"{icon} Issue {fmt_int(iss['ID'])} resolved -- {outcome}, predicted {r:.0%} ({mark})"))
 
     common_open = open_prev_ids & open_cur_ids
     if common_open:
-        prev_bands = risk_prev.loc[list(common_open), "risk"].apply(dd.risk_band)
-        cur_bands = risk_cur.loc[list(common_open), "risk"].apply(dd.risk_band)
+        prev_bands = risk_prev_all.loc[list(common_open)].apply(dd.risk_band)
+        cur_bands = risk_cur_all.loc[list(common_open)].apply(dd.risk_band)
         changed = prev_bands[prev_bands != cur_bands]
         rank = {"low": 0, "medium": 1, "high": 2}
         for iid in changed.index:
-            old_r, new_r = risk_prev.loc[iid, "risk"], risk_cur.loc[iid, "risk"]
-            direction = "⚠️" if rank[cur_bands[iid]] > rank[prev_bands[iid]] else "⬇️"
-            verb = "crossed into higher risk" if rank[cur_bands[iid]] > rank[prev_bands[iid]] else "dropped to lower risk"
-            events.append((T, f"{direction} Issue {int(iid)} {verb} ({old_r:.0%} → {new_r:.0%})"))
+            old_r, new_r = risk_prev_all.loc[iid], risk_cur_all.loc[iid]
+            up = rank[cur_bands[iid]] > rank[prev_bands[iid]]
+            direction = "⚠️" if up else "⬇️"
+            verb = "crossed into higher risk" if up else "dropped to lower risk"
+            events.append((T, f"{direction} Issue {fmt_int(iid)} {verb} ({old_r:.0%} → {new_r:.0%})"))
 
     events.sort(key=lambda e: e[0], reverse=True)
     if events:
         for _, msg in events[:25]:
             st.write(msg)
         if len(events) > 25:
-            st.caption(f"... and {len(events) - 25} more events this step.")
+            st.caption(f"... and {len(events) - 25} more significant events this step.")
     else:
-        st.caption("No events in this step.")
+        st.caption("No significant events this step.")
 
     # --- Open issues table ---
     st.subheader("Open issues, sorted by risk")
     if n_open:
         open_df = mc_issues[mc_issues["ID"].isin(open_cur_ids)].merge(
-            risk_cur.reset_index()[["ID", "risk", "source"]], on="ID", how="left"
+            cls_cur.reset_index()[["ID", "risk", "source", "status", "overrun_multiple"]], on="ID", how="left"
         ).sort_values("risk", ascending=False)
-        display_mc = open_df[["ID", "Title", "Type", "Priority", "Assignee_ID", "risk", "source"]].rename(
-            columns={"risk": "predicted_risk"}
-        ).reset_index(drop=True)
+        display_mc = open_df[["ID", "Title", "Type", "Priority", "Assignee_ID", "status", "risk", "source",
+                               "overrun_multiple"]].rename(columns={"risk": "predicted_risk"}).reset_index(drop=True)
+        display_mc["ID"] = display_mc["ID"].map(fmt_int)
+        display_mc["Assignee_ID"] = display_mc["Assignee_ID"].map(fmt_int)
+        display_mc["overrun_multiple"] = display_mc["overrun_multiple"].map(
+            lambda v: f"{v:.1f}x" if pd.notna(v) else ""
+        )
         styled_mc = display_mc.style.map(
             lambda v: f"background-color:{dd.risk_color(v)}33;color:{dd.risk_color(v)};font-weight:600;",
             subset=["predicted_risk"],
@@ -281,11 +393,11 @@ with tab_mc:
         st.caption("No open issues at this date.")
 
     # --- Project timeline ---
-    st.subheader("Open-issue volume over time (by risk band)")
+    st.subheader("Open-issue volume over time (by status)")
     timeline = get_mission_control_timeline(MC_PROJECT, mc_issues, mc_checkpoints, MC_START, MC_END)
     fig, ax = plt.subplots(figsize=(11, 3.2))
-    ax.stackplot(timeline["date"], timeline["low"], timeline["medium"], timeline["high"],
-                 colors=[GREEN, AMBER, RED], alpha=0.6, labels=["Low", "Medium", "High"])
+    ax.stackplot(timeline["date"], timeline["on_track"], timeline["at_risk"], timeline["overrunning"],
+                 colors=[GREEN, AMBER, RED], alpha=0.6, labels=["On track", "At risk", "Overrunning"])
     ax.axvline(T, color="black", linewidth=1.5, linestyle="--")
     ax.set_ylabel("Open issues", fontsize=11)
     ax.legend(fontsize=9, loc="upper left")
@@ -300,7 +412,7 @@ with tab_mc:
         st.session_state.mc_playing = False
 
 # ---------------------------------------------------------------------
-# Tab 2: Issue Risk & Explanation
+# Tab 2: Issue Risk & Explanation (+ folded-in Reassignment, Step 6)
 # ---------------------------------------------------------------------
 with tab2:
     st.header("Issue Risk & Explanation")
@@ -320,25 +432,32 @@ with tab2:
     else:
         options = matches["ID"].tolist()
         labels = {
-            row["ID"]: f"{row['ID']} - {row['Title'][:60]} (risk={row['dynamic_risk']:.0%})"
+            row["ID"]: f"{fmt_int(row['ID'])} - {row['Title'][:60]} (risk={row['dynamic_risk']:.0%})"
             for _, row in matches.iterrows()
         }
         selected_id = st.selectbox(
-            "Select issue", options, format_func=lambda i: labels[i], key="tab2_select"
+            "Select issue", options, format_func=lambda i: labels[i], index=0,
+            key=f"tab2_select_{search}",
         )
 
         row = portfolio[portfolio["ID"] == selected_id].iloc[0]
         proj_avg = portfolio.loc[portfolio["Project_ID"] == row["Project_ID"], "dynamic_risk"].mean()
+        below_m3 = row["checkpoint_index"] < CROSSOVER_CHECKPOINT
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Predicted risk (dynamic)", f"{row['dynamic_risk']:.0%}",
                     f"{row['dynamic_risk'] - proj_avg:+.0%} vs. project avg")
         col2.metric("Predicted risk (static)", f"{row['static_risk']:.0%}")
-        col3.metric("Checkpoint reached", f"M{int(row['checkpoint_index'])}")
+        col3.metric("Checkpoint reached", f"M{fmt_int(row['checkpoint_index'])}")
         st.markdown(risk_badge(row["dynamic_risk"]), unsafe_allow_html=True)
+        if below_m3:
+            st.caption(
+                "⚠️ This issue is below the M3 reliability threshold -- the static (creation-time) "
+                "estimate is the more trustworthy number here."
+            )
 
         st.write(f"**Type:** {row['Type']}  |  **Priority:** {row['Priority']}  |  "
-                 f"**Assignee:** {row['Assignee_ID']}  |  **Project:** {row['Project_ID']}")
+                 f"**Assignee:** {fmt_int(row['Assignee_ID'])}  |  **Project:** {fmt_int(row['Project_ID'])}")
 
         # --- Risk trajectory chart with cohort band ---
         st.subheader("Risk trajectory across checkpoints")
@@ -354,7 +473,7 @@ with tab2:
             ax.axhspan(0.7, 1.0, color=RED, alpha=0.06)
 
             ax.fill_between(cohort["checkpoint_index"], cohort["q25"], cohort["q75"],
-                             color="#4C78A8", alpha=0.15, label=f"Cohort IQR (Project {row['Project_ID']}, {row['Type']})")
+                             color="#4C78A8", alpha=0.15, label=f"Cohort IQR (Project {fmt_int(row['Project_ID'])}, {row['Type']})")
             ax.plot(cohort["checkpoint_index"], cohort["median"], color="#4C78A8", linewidth=1.5,
                     linestyle="--", alpha=0.7, label="Cohort median")
 
@@ -389,7 +508,7 @@ with tab2:
             ax.set_ylim(-0.02, 1.05)
             ax.tick_params(labelsize=11)
             ax.legend(fontsize=9, loc="lower right")
-            ax.set_title(f"Issue {selected_id}: risk trajectory vs. cohort", fontsize=13)
+            ax.set_title(f"Issue {fmt_int(selected_id)}: risk trajectory vs. cohort", fontsize=13)
             st.pyplot(fig, clear_figure=True)
 
             last_ck = int(traj.iloc[-1]["checkpoint_index"])
@@ -468,21 +587,32 @@ with tab2:
         else:
             st.caption("Not enough peer issues (same project/type/priority) for a meaningful comparison.")
 
-        # --- What-if controls ---
+        # --- What-if controls (Step 7 fix: per-issue widget keys) ---
         st.subheader("What if...")
+        st.caption(
+            "Note: this model uses only 11 boosting rounds (tuned via validation, not chosen for "
+            "smoothness), so for some issues a moderate slider move produces little to no change -- "
+            "that reflects the model's actual (low) sensitivity to that feature for this specific "
+            "issue, not a bug. Try larger moves or a different issue to see clearer swings."
+        )
         wcol1, wcol2, wcol3 = st.columns(3)
         with wcol1:
-            what_if_concurrent = st.slider("Assignee concurrent open issues", 0, 60,
-                                            int(row["assignee_concurrent_open"]), key="wi_concurrent")
+            what_if_concurrent = st.slider(
+                "Assignee concurrent open issues", 0, 60, int(row["assignee_concurrent_open"]),
+                key=f"wi_concurrent_{selected_id}",
+            )
         with wcol2:
-            what_if_delay_rate = st.slider("Assignee historical delay rate", 0.0, 1.0,
-                                            float(row["assignee_prior_delay_rate"]) if pd.notna(row["assignee_prior_delay_rate"]) else 0.5,
-                                            key="wi_delay_rate")
+            default_delay_rate = float(row["assignee_prior_delay_rate"]) if pd.notna(row["assignee_prior_delay_rate"]) else 0.5
+            what_if_delay_rate = st.slider(
+                "Assignee historical delay rate", 0.0, 1.0, default_delay_rate,
+                key=f"wi_delay_rate_{selected_id}",
+            )
         with wcol3:
             priority_options = sorted(portfolio["Priority_Normalized"].cat.categories.tolist())
-            what_if_priority = st.selectbox("Priority", priority_options,
-                                             index=priority_options.index(row["Priority_Normalized"]),
-                                             key="wi_priority")
+            what_if_priority = st.selectbox(
+                "Priority", priority_options, index=priority_options.index(row["Priority_Normalized"]),
+                key=f"wi_priority_{selected_id}",
+            )
 
         what_if_row = row_features.copy()
         what_if_row["assignee_concurrent_open"] = float(what_if_concurrent)
@@ -494,6 +624,65 @@ with tab2:
         wcol_result1.metric("Original predicted risk", f"{row['dynamic_risk']:.0%}")
         wcol_result2.metric("What-if predicted risk", f"{what_if_risk:.0%}",
                             f"{what_if_risk - row['dynamic_risk']:+.0%}")
+
+        # --- Step 6: Reassignment folded into the issue view ---
+        st.subheader("Reassignment")
+        if st.button("Check reassignment", key=f"check_reassignment_{selected_id}"):
+            if below_m3:
+                reassign_model, reassign_cols, model_label = (
+                    static_model, dd.STATIC_FEATURE_COLS_V2,
+                    "creation-time estimate -- this issue has not yet reached the M3 reliability threshold",
+                )
+            else:
+                reassign_model, reassign_cols, model_label = dynamic_model, dd.DYN_FEATURE_COLS, "dynamic"
+
+            result = ra.suggest_reassignment(
+                selected_id, portfolio, feat_full, dynamic_model, top_n=5,
+                model=reassign_model, feature_cols=reassign_cols, model_label=model_label,
+            )
+            if below_m3:
+                st.caption(f"ℹ️ Using the **static** model for this suggestion ({model_label}).")
+
+            st.write(f"**Top risk drivers:** " + ", ".join(f"{f} ({v:+.3f})" for f, v in result["top_drivers"]))
+
+            if result["verdict"] == "reassignment_may_help":
+                st.success(f"### ✅ Reassignment may help\n{result['explanation']}")
+            else:
+                st.warning(f"### ⚠️ Reassignment unlikely to help\n{result['explanation']}")
+
+            if result["candidates"]:
+                cand_df = pd.DataFrame(result["candidates"])
+                bars = pd.concat([
+                    pd.DataFrame([{"assignee_id": f"{fmt_int(result['current_assignee_id'])} (current)",
+                                    "predicted_risk": result["current_risk"], "is_current": True}]),
+                    cand_df.assign(
+                        assignee_id=cand_df["assignee_id"].apply(fmt_int), is_current=False
+                    )[["assignee_id", "predicted_risk", "is_current"]],
+                ]).sort_values("predicted_risk", ascending=True)
+
+                fig_r, ax_r = plt.subplots(figsize=(8, max(2.5, 0.5 * len(bars))))
+                colors_r = ["#0b0b0b" if is_cur else dd.risk_color(r)
+                            for r, is_cur in zip(bars["predicted_risk"], bars["is_current"])]
+                ax_r.barh(bars["assignee_id"], bars["predicted_risk"], color=colors_r)
+                ax_r.axvline(RISK_THRESHOLD, color="grey", linestyle="--", linewidth=1)
+                ax_r.set_xlabel("Predicted risk", fontsize=11)
+                ax_r.set_xlim(0, 1)
+                ax_r.tick_params(labelsize=10)
+                for spine in ["top", "right"]:
+                    ax_r.spines[spine].set_visible(False)
+                st.pyplot(fig_r, clear_figure=True)
+                st.caption("Black bar = current assignee. Bar colour follows the same risk bands as elsewhere.")
+
+                with st.expander("Show as table"):
+                    cand_display = cand_df.copy()
+                    cand_display["assignee_id"] = cand_display["assignee_id"].map(fmt_int)
+                    cand_display["predicted_risk"] = cand_display["predicted_risk"].map(lambda v: fmt_num(v, 2))
+                    cand_display["risk_delta"] = cand_display["risk_delta"].map(lambda v: fmt_num(v, 2))
+                    st.dataframe(cand_display, width="stretch")
+
+            if result.get("candidate_pool_threshold"):
+                st.caption(f"Candidate pool: developers with >= {result['candidate_pool_threshold']} "
+                           f"prior resolved issues in this project.")
 
 # ---------------------------------------------------------------------
 # Tab 3: Team (workload table + heatmap)
@@ -520,6 +709,9 @@ with tab3:
         "assignee_prior_delay_rate": "historical_delay_rate",
         "assignee_prior_resolved_count": "prior_resolved_count",
     }).reset_index(drop=True)
+    workload_df["Assignee_ID"] = workload_df["Assignee_ID"].map(fmt_int)
+    workload_df["concurrent_open_issues"] = workload_df["concurrent_open_issues"].map(fmt_int)
+    workload_df["prior_resolved_count"] = workload_df["prior_resolved_count"].map(fmt_int)
     styled_workload = workload_df.style.map(
         lambda v: f"background-color: {dd.risk_color(v)}33; color: {dd.risk_color(v)}; font-weight: 600;",
         subset=["historical_delay_rate"],
@@ -544,73 +736,10 @@ with tab3:
             ax_h.set_xticks(range(pivot.shape[1]))
             ax_h.set_xticklabels(pivot.columns, rotation=45, ha="right", fontsize=8)
             ax_h.set_yticks(range(pivot.shape[0]))
-            ax_h.set_yticklabels([str(int(a)) for a in pivot.index], fontsize=8)
+            ax_h.set_yticklabels([fmt_int(a) for a in pivot.index], fontsize=8)
             fig_h.colorbar(im, ax=ax_h, label="Average predicted risk", shrink=0.8)
             st.pyplot(fig_h, clear_figure=True)
         else:
             st.caption("Not enough data for a heatmap in this project's test-portfolio slice.")
     else:
         st.caption("No portfolio issues for this project.")
-
-# ---------------------------------------------------------------------
-# Tab 4: Reassignment Suggester
-# ---------------------------------------------------------------------
-with tab4:
-    st.header("Reassignment Suggester")
-    at_risk_df = portfolio[portfolio["at_risk"]].sort_values("dynamic_risk", ascending=False)
-    st.caption(f"{len(at_risk_df)} at-risk issues in the portfolio (risk >= {RISK_THRESHOLD}).")
-
-    options4 = at_risk_df["ID"].head(200).tolist()
-    labels4 = {
-        row["ID"]: f"{row['ID']} - {row['Title'][:60]} (risk={row['dynamic_risk']:.0%})"
-        for _, row in at_risk_df.head(200).iterrows()
-    }
-    selected_id_4 = st.selectbox(
-        "Select an at-risk issue", options4, format_func=lambda i: labels4[i], key="tab4_select"
-    )
-
-    result = ra.suggest_reassignment(selected_id_4, portfolio, feat_full, dynamic_model, top_n=5)
-    current_assignee = result["current_assignee_id"]
-
-    st.metric("Current predicted risk", f"{result['current_risk']:.0%}")
-    st.markdown(risk_badge(result["current_risk"]), unsafe_allow_html=True)
-    st.write(f"**Top risk drivers:** " + ", ".join(f"{f} ({v:+.3f})" for f, v in result["top_drivers"]))
-
-    if result["verdict"] == "reassignment_may_help":
-        st.success(f"### ✅ Reassignment may help\n{result['explanation']}")
-    else:
-        st.warning(f"### ⚠️ Reassignment unlikely to help\n{result['explanation']}")
-
-    if result["candidates"]:
-        st.subheader("Candidate comparison")
-        cand_df = pd.DataFrame(result["candidates"])
-        bars = pd.concat([
-            pd.DataFrame([{"assignee_id": f"{int(current_assignee)} (current)",
-                            "predicted_risk": result["current_risk"], "is_current": True}]),
-            cand_df.assign(
-                assignee_id=cand_df["assignee_id"].apply(lambda a: str(int(a))), is_current=False
-            )[["assignee_id", "predicted_risk", "is_current"]],
-        ]).sort_values("predicted_risk", ascending=True)
-
-        fig, ax = plt.subplots(figsize=(8, max(2.5, 0.5 * len(bars))))
-        colors = ["#0b0b0b" if is_cur else dd.risk_color(r)
-                  for r, is_cur in zip(bars["predicted_risk"], bars["is_current"])]
-        ax.barh(bars["assignee_id"], bars["predicted_risk"], color=colors)
-        ax.axvline(RISK_THRESHOLD, color="grey", linestyle="--", linewidth=1)
-        ax.set_xlabel("Predicted risk", fontsize=11)
-        ax.set_xlim(0, 1)
-        ax.tick_params(labelsize=10)
-        for spine in ["top", "right"]:
-            ax.spines[spine].set_visible(False)
-        st.pyplot(fig, clear_figure=True)
-        st.caption("Black bar = current assignee. Bar colour follows the same risk bands as elsewhere in the app.")
-
-        with st.expander("Show as table"):
-            cand_df_display = cand_df.copy()
-            cand_df_display["predicted_risk"] = cand_df_display["predicted_risk"].round(3)
-            cand_df_display["risk_delta"] = cand_df_display["risk_delta"].round(3)
-            st.dataframe(cand_df_display, width="stretch")
-
-    if result.get("candidate_pool_threshold"):
-        st.caption(f"Candidate pool: developers with >= {result['candidate_pool_threshold']} "
-                   f"prior resolved issues in this project.")

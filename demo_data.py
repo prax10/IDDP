@@ -185,7 +185,86 @@ def load_project_for_replay(project_id, static_model, dynamic_model):
 
     ck = ck.sort_values("checkpoint_time")
     checkpoints = ck[["Issue_ID", "checkpoint_index", "checkpoint_time", "dynamic_risk"]].reset_index(drop=True)
+
+    # expected_duration_proxy, exactly recovered per issue: by construction
+    # elapsed_minutes = (checkpoint_index/10) * expected_duration_proxy at
+    # every checkpoint (verified exactly, corr=1.0, in Task B2's Part A) --
+    # so any single checkpoint row recovers it precisely, no recomputation
+    # of the hierarchical median needed.
+    first_ck = ck.sort_values("checkpoint_index").drop_duplicates("Issue_ID", keep="first")
+    expected_duration = first_ck["elapsed_minutes"] / (first_ck["checkpoint_index"] / 10.0)
+    expected_duration_df = pd.DataFrame({
+        "ID": first_ck["Issue_ID"].values, "expected_duration_minutes": expected_duration.values,
+    })
+    issues = issues.merge(expected_duration_df, on="ID", how="left")
     return issues, checkpoints
+
+
+def classify_at_time(issues, checkpoints, T):
+    """Per open issue at T: risk/source (from risk_at_time) plus an
+    Overrunning / At risk / On track split.
+
+    Overrunning = elapsed time so far already exceeds expected_duration_minutes
+    (a FACT -- the issue is already running long -- not a forecast). Issues
+    with no checkpoint history yet (expected_duration_minutes unknown) can
+    never be classified overrunning and fall through to at-risk/on-track
+    by predicted risk alone.
+    """
+    T = pd.Timestamp(T)
+    risk_df = risk_at_time(issues, checkpoints, T).set_index("ID")
+    elapsed_minutes = (T - issues.set_index("ID")["Creation_Date"]).dt.total_seconds() / 60.0
+    expected = issues.set_index("ID")["expected_duration_minutes"]
+
+    out = risk_df.copy()
+    out["elapsed_minutes"] = elapsed_minutes.reindex(out.index)
+    out["expected_duration_minutes"] = expected.reindex(out.index)
+    out["overrun_multiple"] = out["elapsed_minutes"] / out["expected_duration_minutes"]
+
+    is_overrunning = out["expected_duration_minutes"].notna() & (out["overrun_multiple"] > 1.0)
+    out["status"] = np.select(
+        [is_overrunning, out["risk"] >= DEFAULT_THRESHOLD],
+        ["overrunning", "at_risk"],
+        default="on_track",
+    )
+    return out.reset_index()
+
+
+# Each pair verified directional and reciprocally consistent against the
+# raw data (not a keyword guess): for every (A, desc, B) row there is a
+# matching (B, inverse-desc, A) row. "blocks"/"is blocked by" is Jira's
+# explicit blocking link; "depends on"/"is depended on by" and "has to be
+# done before/after" encode the same directional precedence semantics
+# under different labels (some projects use one vocabulary, some another
+# -- Project 43 exclusively uses the latter two, never "blocks" itself).
+# desc -> (is_forward,) where forward means Issue_ID is the BLOCKER.
+BLOCKING_DIRECTION = {
+    "blocks": True, "is blocked by": False,
+    "depends on": False, "is depended on by": True,
+    "has to be done before": True, "has to be done after": False,
+}
+
+
+def load_blocking_graph(project_id, issue_ids):
+    """Directed blocker -> blocked edges for this project. Returns
+    {blocker_id: [blocked_id, ...]}."""
+    il = pd.read_csv(f"{RAW_DIR}/issue_link.csv")
+    il = il[il["Issue_ID"].isin(issue_ids) & il["Description"].isin(BLOCKING_DIRECTION)]
+
+    edges = set()
+    for _, r in il.iterrows():
+        a, desc, b = r["Issue_ID"], r["Description"], r["Target_Issue_ID"]
+        if pd.isna(a) or pd.isna(b):
+            continue
+        a, b = int(a), int(b)
+        if BLOCKING_DIRECTION[desc]:
+            edges.add((a, b))
+        else:
+            edges.add((b, a))
+
+    graph = {}
+    for blocker, blocked in edges:
+        graph.setdefault(blocker, []).append(blocked)
+    return graph
 
 
 def risk_at_time(issues, checkpoints, T):
