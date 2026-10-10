@@ -143,6 +143,76 @@ def build_issue_trajectory(issue_id, static_row, all_checkpoints, dynamic_model)
 MISSION_CONTROL_PROJECT = 43
 MISSION_CONTROL_START = pd.Timestamp("2020-01-01")
 MISSION_CONTROL_END = pd.Timestamp("2020-04-30")
+TEST_PERIOD_START = pd.Timestamp("2018-05-10")  # global train/val/test date cutoff, verified against phase8_split.csv
+BASELINE_MIN_GROUP = 5
+
+
+def project_date_range(project_id):
+    """(start, end): this project's own first-issue-created to
+    last-issue-resolved dates, restricted to issues with computed features
+    (every issue in this dataset is ultimately resolved -- Phase 6/8 only
+    ever built features for resolved issues)."""
+    raw = load_raw_display_fields()
+    feat = load_feature_table()
+    resolution = pd.read_csv(f"{RAW_DIR}/issue.csv", usecols=["ID", "Resolution_Date"], parse_dates=["Resolution_Date"])
+    proj_ids = set(raw.loc[raw["Project_ID"] == project_id, "ID"]) & set(feat["ID"])
+    start = raw.loc[raw["ID"].isin(proj_ids), "Creation_Date"].min()
+    end = resolution.loc[resolution["ID"].isin(proj_ids), "Resolution_Date"].max()
+    return start, end
+
+
+def projects_with_test_period():
+    """Project IDs with at least one issue created on/after the global test
+    boundary -- i.e. projects Mission Control can genuinely demonstrate
+    held-out prediction on. Excludes any project whose entire history was
+    used in training/validation (nothing held out to show)."""
+    raw = load_raw_display_fields()
+    feat = load_feature_table()
+    raw = raw[raw["ID"].isin(feat["ID"])]
+    has_test = raw.groupby("Project_ID")["Creation_Date"].max() >= TEST_PERIOD_START
+    return sorted(has_test[has_test].index.tolist())
+
+
+def project_type_duration_baseline(feat_full, project_id):
+    """Historical resolution-time baseline per issue type, STRICTLY at the
+    (project, type) level -- no fallback to project-wide or global medians.
+    Returns a DataFrame indexed by Type_Normalized with median_days, n,
+    sufficient (n >= BASELINE_MIN_GROUP). A type with sufficient=False must
+    never be classified overrunning: comparing against a global/project-wide
+    median when this project's own history for that type is too thin to
+    trust is exactly what caused ~100 of 121 issues to be flagged."""
+    sub = feat_full[feat_full["Project_ID"] == project_id]
+    g = sub.groupby("Type_Normalized", observed=True)["Resolution_Time_Minutes"]
+    out = pd.DataFrame({"median_minutes": g.median(), "n": g.size()})
+    out["median_days"] = out["median_minutes"] / 1440.0
+    out["sufficient"] = out["n"] >= BASELINE_MIN_GROUP
+    return out.drop(columns=["median_minutes"])
+
+
+def target_reality_check(feat_full, project_id, type_norm, target_days):
+    """How this manager's target compares to actual history: (historical
+    median in days, fraction of past resolved issues of this type in this
+    project that would have MISSED this target, n) -- or None if history is
+    too thin (< BASELINE_MIN_GROUP) to compute honestly. Pure arithmetic
+    against real resolution times; never touches a model."""
+    sub = feat_full[(feat_full["Project_ID"] == project_id) & (feat_full["Type_Normalized"] == type_norm)]
+    n = len(sub)
+    if n < BASELINE_MIN_GROUP:
+        return None
+    minutes = sub["Resolution_Time_Minutes"]
+    median_days = minutes.median() / 1440.0
+    pct_missed = float((minutes > target_days * 1440.0).mean())
+    return median_days, pct_missed, n
+
+
+def target_status(elapsed_days, type_norm, targets):
+    """Pure arithmetic against a manager's target -- no model involved, by
+    construction (this function never sees static_model/dynamic_model).
+    targets: dict {Type_Normalized: target_days}."""
+    target_days = targets.get(type_norm)
+    if target_days is None:
+        return "no_target_set"
+    return "past_target" if elapsed_days > target_days else "within_target"
 
 
 def load_project_for_replay(project_id, static_model, dynamic_model):
@@ -186,17 +256,20 @@ def load_project_for_replay(project_id, static_model, dynamic_model):
     ck = ck.sort_values("checkpoint_time")
     checkpoints = ck[["Issue_ID", "checkpoint_index", "checkpoint_time", "dynamic_risk"]].reset_index(drop=True)
 
-    # expected_duration_proxy, exactly recovered per issue: by construction
-    # elapsed_minutes = (checkpoint_index/10) * expected_duration_proxy at
-    # every checkpoint (verified exactly, corr=1.0, in Task B2's Part A) --
-    # so any single checkpoint row recovers it precisely, no recomputation
-    # of the hierarchical median needed.
-    first_ck = ck.sort_values("checkpoint_index").drop_duplicates("Issue_ID", keep="first")
-    expected_duration = first_ck["elapsed_minutes"] / (first_ck["checkpoint_index"] / 10.0)
-    expected_duration_df = pd.DataFrame({
-        "ID": first_ck["Issue_ID"].values, "expected_duration_minutes": expected_duration.values,
-    })
-    issues = issues.merge(expected_duration_df, on="ID", how="left")
+    # Task F fix: expected_duration_minutes now comes from the historical
+    # (project, type) median, capped at BASELINE_MIN_GROUP with NO fallback
+    # to project-wide/global (see project_type_duration_baseline) -- NOT
+    # the per-issue-exact Phase 8 proxy recovery this replaced, which
+    # inherited Phase 8's fallthrough-to-global hierarchy and produced a
+    # meaningless baseline for sparse (project, type) combinations, flagging
+    # ~100 of 121 open issues as overrunning. A type with insufficient
+    # history gets NaN here, which classify_at_time already treats as
+    # "never overrunning."
+    baseline = project_type_duration_baseline(feat, project_id)
+    type_expected_minutes = (baseline["median_days"] * 1440.0).where(baseline["sufficient"])
+    issues["expected_duration_minutes"] = (
+        issues["Type_Normalized"].astype(str).map(type_expected_minutes).astype(float)
+    )
     return issues, checkpoints
 
 

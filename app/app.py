@@ -34,10 +34,8 @@ GREEN, AMBER, RED = dd.RISK_COLORS["low"], dd.RISK_COLORS["medium"], dd.RISK_COL
 STATIC_TEST_AUC = 0.743
 DYNAMIC_M10_AUC = 0.859
 
-MC_PROJECT = dd.MISSION_CONTROL_PROJECT
-MC_START = dd.MISSION_CONTROL_START
-MC_END = dd.MISSION_CONTROL_END
-MC_DEFAULT_START = MC_START + (MC_END - MC_START) / 3  # Step 5: open mid-window, not dead-on-arrival
+MC_PROJECT_DEFAULT = dd.MISSION_CONTROL_PROJECT
+TEST_PERIOD_START = dd.TEST_PERIOD_START
 
 
 def risk_badge(risk):
@@ -113,8 +111,32 @@ def get_blocking_graph(project_id, issue_ids):
 
 
 @st.cache_data
+def get_project_date_range(project_id):
+    return dd.project_date_range(project_id)
+
+
+@st.cache_data
+def get_projects_with_test_period():
+    return dd.projects_with_test_period()
+
+
+@st.cache_data
+def get_project_options():
+    """{project_id: n_issues} for every project Mission Control can offer --
+    i.e. projects with at least one genuinely held-out (test-split) issue."""
+    raw = dd.load_raw_display_fields()
+    feat = dd.load_feature_table()
+    raw = raw[raw["ID"].isin(feat["ID"])]
+    eligible = get_projects_with_test_period()
+    counts = raw[raw["Project_ID"].isin(eligible)].groupby("Project_ID").size()
+    return counts.to_dict()
+
+
+@st.cache_data
 def get_mission_control_timeline(project_id, issues, checkpoints, start, end):
-    dates = pd.date_range(start, end, freq="D")
+    span_days = (end - start).days
+    freq = "D" if span_days <= 400 else ("W" if span_days <= 1500 else "MS")
+    dates = pd.date_range(start, end, freq=freq)
     rows = []
     for d in dates:
         cls = dd.classify_at_time(issues, checkpoints, d)
@@ -159,10 +181,15 @@ with st.expander("How it works", expanded=False):
   has elapsed (checkpoint M3)** -- confirmed via bootstrap confidence intervals. Mission Control and
   the trajectory chart both enforce this rule directly: before M3 you see the static estimate,
   labelled as such.
-- **Overrunning vs. at risk (Mission Control):** an issue that has already exceeded its own expected
-  duration is a **fact**, not a forecast -- it's tracked separately from the genuine at-risk/on-track
-  prediction queue. We call this "overrunning" or "past expected duration," never "past deadline" --
-  TAWOS has no deadline field, nothing in the data represents a commitment.
+- **Overrunning vs. at risk (Mission Control):** an issue that has already exceeded its own project's
+  historical median resolution time **for its own issue type** is a **fact**, not a forecast -- it's
+  tracked separately from the genuine at-risk/on-track prediction queue. That baseline is capped at
+  the (project, type) level with a minimum of {dd.BASELINE_MIN_GROUP} prior resolved issues and
+  **never falls through to a project-wide or global median** -- a type with too little history is
+  labelled "insufficient history" and is never classified overrunning, rather than being compared
+  against a baseline that isn't actually representative of it. We call this "overrunning" or "past
+  expected duration," never "past deadline" -- TAWOS has no deadline field, nothing in the data
+  represents a commitment.
 - **Decision threshold:** **{RISK_THRESHOLD}** for at-risk/on-track calls; {dd.F1_THRESHOLD} was
   separately tuned to optimize F1 if that's the operating point you care about.
 - **Risk colour coding (used everywhere):**
@@ -171,11 +198,18 @@ with st.expander("How it works", expanded=False):
   <span style="color:{RED};font-weight:600;">red &gt; 0.7</span>.
 - **Mission Control is a REPLAY of real historical data, not a live feed.** It shows what the
   model would genuinely have predicted, day by day, using only information available as of each
-  date shown -- no data has been fabricated or simulated. The window (Project {MC_PROJECT},
-  {MC_START.date()} to {MC_END.date()}) falls entirely within the model's held-out test period.
-- **Blocking relationships:** Project {MC_PROJECT} records directed link types ("depends on" /
-  "has to be done before" and equivalents) that let us tell which issue blocks which -- verified
-  directional and reciprocal in the raw data, not inferred from keyword guesses.
+  date shown -- no data has been fabricated or simulated. Each project's full history is shown; the
+  portion before {TEST_PERIOD_START.date()} is shaded on the chart as **in-sample** (the model
+  trained on it), so only the unshaded portion is a genuine out-of-sample prediction. Only projects
+  with at least one issue created on/after {TEST_PERIOD_START.date()} are offered, so every project
+  in the selector has some genuine held-out portion to show.
+- **Manager targets never enter the model.** A target is a policy statement ("we want Bugs done in
+  5 days"), not evidence about how long work actually takes -- feeding it into the model would let
+  changing what you *want* change the model's risk estimate, which is backwards. Targets are pure
+  arithmetic against elapsed time, computed entirely outside the model.
+- **Blocking relationships:** directed link types ("depends on" / "has to be done before" /
+  "blocks" and equivalents) let us tell which issue blocks which -- verified directional and
+  reciprocal in the raw data, not inferred from keyword guesses.
 - **Other tabs' data note:** outside Mission Control, the app uses held-out (test-split) resolved
   issues at their last observed checkpoint as a stand-in "current" portfolio, since there is no
   live feed of in-progress issues with computed features in this project.
@@ -187,25 +221,74 @@ tab_mc, tab2, tab3 = st.tabs(["🎛️ Mission Control", "Issue Risk & Explanati
 # Tab: Mission Control (time-travel replay)
 # ---------------------------------------------------------------------
 with tab_mc:
-    mc_issues, mc_checkpoints = get_mission_control_data(MC_PROJECT, static_model, dynamic_model)
-    blocking_graph = get_blocking_graph(MC_PROJECT, tuple(mc_issues["ID"]))
 
-    if "mc_cursor" not in st.session_state:
-        st.session_state.mc_cursor = MC_DEFAULT_START
-    if "mc_playing" not in st.session_state:
+    def _project_default_step(pid):
+        start, end = get_project_date_range(pid)
+        span_years = (end - start).days / 365.25
+        return "1 month" if span_years > 2 else "1 week"
+
+    def _project_default_cursor(pid):
+        start, end = get_project_date_range(pid)
+        return TEST_PERIOD_START + (end - TEST_PERIOD_START) / 3
+
+    def _apply_project_switch(pid):
+        st.session_state.mc_active_project = pid
+        st.session_state.mc_targets = {}
+        st.session_state.mc_closed_ids = set()
+        st.session_state.mc_table_filter = None
+        st.session_state.mc_cursor = _project_default_cursor(pid)
+        st.session_state.mc_step = _project_default_step(pid)
         st.session_state.mc_playing = False
-    if "mc_step" not in st.session_state:
-        st.session_state.mc_step = "1 week"
 
-    # --- Step 2: sticky context header (always visible, reflects state
-    # BEFORE this run's widgets are drawn -- Streamlit already updated
-    # session_state by the time the script re-executes, so this is current) ---
+    if "mc_active_project" not in st.session_state:
+        _apply_project_switch(MC_PROJECT_DEFAULT)
+    if "mc_confirm_full_reset" not in st.session_state:
+        st.session_state.mc_confirm_full_reset = False
+
+    project_counts = get_project_options()
+    project_choices = sorted(project_counts.keys())
+
+    # --- Step 1: project selector (with confirmation only when there are
+    # unsaved manager modifications to lose) ---
+    ui_project = st.selectbox(
+        "Project", project_choices,
+        index=project_choices.index(st.session_state.mc_active_project),
+        format_func=lambda p: f"{p} ({project_counts[p]} issues)",
+        key="mc_project_select",
+    )
+    has_mods = bool(st.session_state.mc_targets) or bool(st.session_state.mc_closed_ids)
+    if ui_project != st.session_state.mc_active_project:
+        if not has_mods:
+            _apply_project_switch(ui_project)
+        else:
+            st.warning(
+                f"Switching to project {ui_project} will clear {len(st.session_state.mc_targets)} "
+                f"target(s) and {len(st.session_state.mc_closed_ids)} closed issue(s) set for "
+                f"project {st.session_state.mc_active_project}."
+            )
+            cc1, cc2 = st.columns(2)
+            if cc1.button("Confirm switch", key="mc_confirm_switch_yes"):
+                _apply_project_switch(ui_project)
+                st.rerun()
+            if cc2.button("Cancel", key="mc_confirm_switch_cancel"):
+                del st.session_state["mc_project_select"]
+                st.rerun()
+
+    project_id = st.session_state.mc_active_project
+    project_start, project_end = get_project_date_range(project_id)
+
+    mc_issues, mc_checkpoints = get_mission_control_data(project_id, static_model, dynamic_model)
+    blocking_graph = get_blocking_graph(project_id, tuple(mc_issues["ID"]))
+    title_lookup = mc_issues.set_index("ID")["Title"]
+    type_lookup = mc_issues.set_index("ID")["Type_Normalized"]
+
+    # --- Step 2: sticky context header ---
     st.markdown(
         f"""
         <div style="position: sticky; top: 0; z-index: 999; background-color: rgba(240,240,240,0.97);
                     padding: 10px 14px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 10px;
                     font-size: 1.05rem;">
-        🎛️ <b>Mission Control</b> &nbsp;·&nbsp; Project <b>{MC_PROJECT}</b>
+        🎛️ <b>Mission Control</b> &nbsp;·&nbsp; Project <b>{project_id}</b>
         &nbsp;·&nbsp; Replay date: <b>{pd.Timestamp(st.session_state.mc_cursor).date()}</b>
         &nbsp;·&nbsp; Step: <b>{st.session_state.mc_step}</b>
         </div>
@@ -213,41 +296,123 @@ with tab_mc:
         unsafe_allow_html=True,
     )
     st.caption(
-        f"Replaying real historical issues with real leakage-safe predictions -- this window falls "
-        f"entirely within the model's held-out test period, not a live feed."
+        f"Replaying real historical issues with real leakage-safe predictions, not a live feed -- "
+        f"full history {project_start.date()} to {project_end.date()}, held-out test period starts "
+        f"{TEST_PERIOD_START.date()}."
     )
 
     col_a, col_b, col_c, col_d = st.columns([2, 1, 1, 1])
     with col_a:
         cursor_date = st.slider(
-            "Replay date", min_value=MC_START.to_pydatetime(), max_value=MC_END.to_pydatetime(),
-            value=pd.Timestamp(st.session_state.mc_cursor).to_pydatetime(), format="YYYY-MM-DD", key="mc_slider",
+            "Replay date", min_value=project_start.to_pydatetime(), max_value=project_end.to_pydatetime(),
+            value=pd.Timestamp(st.session_state.mc_cursor).to_pydatetime(), format="YYYY-MM-DD",
+            key=f"mc_slider_{project_id}",
         )
         st.session_state.mc_cursor = pd.Timestamp(cursor_date)
     with col_b:
-        step_label = st.selectbox("Step size", ["1 day", "1 week"],
-                                   index=["1 day", "1 week"].index(st.session_state.mc_step), key="mc_step_select")
+        step_choices = ["1 day", "1 week", "1 month"]
+        step_label = st.selectbox("Step size", step_choices,
+                                   index=step_choices.index(st.session_state.mc_step),
+                                   key=f"mc_step_select_{project_id}")
         st.session_state.mc_step = step_label
-        step = pd.Timedelta(days=1) if step_label == "1 day" else pd.Timedelta(weeks=1)
+        step = {"1 day": pd.Timedelta(days=1), "1 week": pd.Timedelta(weeks=1),
+                "1 month": pd.DateOffset(months=1)}[step_label]
     with col_c:
-        playing = st.checkbox("▶ Play", value=st.session_state.mc_playing, key="mc_play_checkbox")
+        playing = st.checkbox("▶ Play", value=st.session_state.mc_playing, key=f"mc_play_checkbox_{project_id}")
         st.session_state.mc_playing = playing
     with col_d:
         if st.button("⟲ Reset to start"):
-            st.session_state.mc_cursor = MC_START
+            st.session_state.mc_cursor = project_start
             st.session_state.mc_playing = False
             st.rerun()
+        if not st.session_state.mc_confirm_full_reset:
+            if st.button("🔄 Full reset"):
+                st.session_state.mc_confirm_full_reset = True
+                st.rerun()
+        else:
+            st.warning("Full reset clears all targets and closed issues, and resets the cursor.")
+            rc1, rc2 = st.columns(2)
+            if rc1.button("Yes, reset", key="mc_full_reset_yes"):
+                _apply_project_switch(project_id)
+                st.session_state.mc_confirm_full_reset = False
+                st.rerun()
+            if rc2.button("Cancel", key="mc_full_reset_cancel"):
+                st.session_state.mc_confirm_full_reset = False
+                st.rerun()
 
-    T = st.session_state.mc_cursor
-    T_prev = max(MC_START, T - step)
+    T = pd.Timestamp(st.session_state.mc_cursor)
+    T_prev = max(project_start, T - step)
+
+    # --- Step 3 (config panel): historical baselines & manager targets ---
+    with st.expander("⚙️ Configuration: historical baselines & manager targets", expanded=False):
+        st.caption(
+            "Targets change how issues are categorised against your standard. They do not change "
+            "the model's risk estimate, which is computed from this project's historical behaviour."
+        )
+        baseline = dd.project_type_duration_baseline(feat_full, project_id)
+        mc_targets = st.session_state.mc_targets
+        for type_norm in sorted(baseline.index.astype(str)):
+            brow = baseline.loc[type_norm]
+            bcol1, bcol2, bcol3 = st.columns([2, 2, 3])
+            with bcol1:
+                if brow["sufficient"]:
+                    st.write(f"**{type_norm}**: {brow['median_days']:.1f}-day historical median "
+                             f"(n={int(brow['n'])})")
+                else:
+                    st.write(f"**{type_norm}**: insufficient history (n={int(brow['n'])})")
+            with bcol2:
+                use_default = st.checkbox(
+                    "Use default (no target)", value=(type_norm not in mc_targets),
+                    key=f"mc_target_default_{project_id}_{type_norm}",
+                )
+                if use_default:
+                    mc_targets.pop(type_norm, None)
+                else:
+                    default_val = mc_targets.get(
+                        type_norm, brow["median_days"] if brow["sufficient"] else 5.0
+                    )
+                    target_val = st.number_input(
+                        "Target (days)", min_value=0.1, value=float(default_val), step=0.5,
+                        key=f"mc_target_val_{project_id}_{type_norm}",
+                    )
+                    mc_targets[type_norm] = float(target_val)
+            with bcol3:
+                if type_norm in mc_targets:
+                    rc = dd.target_reality_check(feat_full, project_id, type_norm, mc_targets[type_norm])
+                    if rc is None:
+                        st.caption("Insufficient history to compute a reality check.")
+                    else:
+                        median_days, pct_missed, n = rc
+                        st.caption(
+                            f"Target: {mc_targets[type_norm]:.1f} days · History: {median_days:.1f}-day "
+                            f"median · {pct_missed:.0%} of past {n} {type_norm}s in this project would "
+                            f"have missed this target."
+                        )
+        if mc_targets:
+            deltas = []
+            for t, tgt in mc_targets.items():
+                if t in baseline.index and baseline.loc[t, "sufficient"]:
+                    med = baseline.loc[t, "median_days"]
+                    deltas.append((med - tgt) / med)
+            if deltas:
+                avg_pct = sum(deltas) / len(deltas) * 100
+                direction = "tighter" if avg_pct >= 0 else "looser"
+                st.markdown(
+                    f"**Your targets are on average {abs(avg_pct):.0f}% {direction} than this "
+                    f"project's historical delivery.**"
+                )
+
+    mc_targets = st.session_state.mc_targets
+    mc_closed_ids = st.session_state.mc_closed_ids
 
     cls_cur = dd.classify_at_time(mc_issues, mc_checkpoints, T).set_index("ID")
     cls_prev = dd.classify_at_time(mc_issues, mc_checkpoints, T_prev).set_index("ID")
     open_cur_mask = dd.open_at_time(mc_issues, T)
     open_prev_mask = dd.open_at_time(mc_issues, T_prev)
 
-    open_cur_ids = set(mc_issues.loc[open_cur_mask, "ID"])
-    open_prev_ids = set(mc_issues.loc[open_prev_mask, "ID"])
+    # Design constraint 2: manager-closed issues leave the open pool entirely.
+    open_cur_ids = set(mc_issues.loc[open_cur_mask, "ID"]) - mc_closed_ids
+    open_prev_ids = set(mc_issues.loc[open_prev_mask, "ID"]) - mc_closed_ids
 
     def _counts(cls, ids):
         if not ids:
@@ -263,26 +428,57 @@ with tab_mc:
     avg_risk = float(cls_cur.loc[non_overrun_cur, "risk"].mean()) if non_overrun_cur else float("nan")
     avg_risk_prev = float(cls_prev.loc[non_overrun_prev, "risk"].mean()) if non_overrun_prev else float("nan")
 
-    # --- Step 1: 5 metric cards, Overrunning split out ---
+    def _vs_target_status(ids, cls):
+        out = {}
+        for iid in ids:
+            elapsed_d = cls.loc[iid, "elapsed_minutes"] / 1440.0
+            out[iid] = dd.target_status(elapsed_d, str(type_lookup.get(iid)), mc_targets)
+        return out
+
+    vs_target_cur = _vs_target_status(open_cur_ids, cls_cur)
+    vs_target_prev = _vs_target_status(open_prev_ids, cls_prev)
+    past_target_cur = sum(1 for v in vs_target_cur.values() if v == "past_target")
+    past_target_prev = sum(1 for v in vs_target_prev.values() if v == "past_target")
+
+    # --- Step 5 (Task F): 5 (or 6) metric cards ---
     n_open, n_open_prev = len(open_cur_ids), len(open_prev_ids)
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Open", n_open, f"{n_open - n_open_prev:+d} vs. last step")
-    m2.metric("Overrunning", cur_counts["overrunning"],
-              f"{cur_counts['overrunning'] - prev_counts['overrunning']:+d} vs. last step")
-    m3.metric("At risk", cur_counts["at_risk"],
-              f"{cur_counts['at_risk'] - prev_counts['at_risk']:+d} vs. last step")
-    m4.metric("On track", cur_counts["on_track"],
-              f"{cur_counts['on_track'] - prev_counts['on_track']:+d} vs. last step")
+    ncols = 6 if mc_targets else 5
+    mcols = st.columns(ncols)
+    mcols[0].metric("Open", n_open, f"{n_open - n_open_prev:+d} vs. last step")
+    mcols[1].metric("Overrunning", cur_counts["overrunning"],
+                     f"{cur_counts['overrunning'] - prev_counts['overrunning']:+d} vs. last step")
+    mcols[2].metric("At risk", cur_counts["at_risk"],
+                     f"{cur_counts['at_risk'] - prev_counts['at_risk']:+d} vs. last step")
+    mcols[3].metric("On track", cur_counts["on_track"],
+                     f"{cur_counts['on_track'] - prev_counts['on_track']:+d} vs. last step")
     avg_delta = (avg_risk - avg_risk_prev) if not (np.isnan(avg_risk) or np.isnan(avg_risk_prev)) else 0.0
-    m5.metric("Avg risk (excl. overrunning)", f"{avg_risk:.0%}" if not np.isnan(avg_risk) else "n/a",
-              f"{avg_delta:+.0%} vs. last step")
+    mcols[4].metric("Avg risk (excl. overrunning)", f"{avg_risk:.0%}" if not np.isnan(avg_risk) else "n/a",
+                     f"{avg_delta:+.0%} vs. last step")
+    if mc_targets:
+        mcols[5].metric("Past target", past_target_cur, f"{past_target_cur - past_target_prev:+d} vs. last step")
     st.caption(
-        "Overrunning issues (already past their own expected duration) are excluded from the "
-        "average and tracked separately below -- they're a fact about the past, not a prediction."
+        "Overrunning issues (already past their own project+type historical median) are excluded "
+        "from the average and tracked separately below -- they're a fact about the past, not a "
+        "prediction. Manager-closed issues leave the open pool entirely."
     )
 
-    # --- Step 4: fixed running scoreboard (only within-replay resolutions) ---
-    resolved_so_far = mc_issues[(mc_issues["Resolution_Date"] > MC_START) & (mc_issues["Resolution_Date"] <= T)]
+    # --- filter row (metric cards act as drill-down filters) ---
+    filter_defs = [(None, "Show all"), ("overrunning", "Overrunning"), ("at_risk", "At risk"),
+                   ("on_track", "On track")]
+    if mc_targets:
+        filter_defs.append(("past_target", "Past target"))
+    fcols = st.columns(len(filter_defs))
+    for i, (fkey, flabel) in enumerate(filter_defs):
+        if fcols[i].button(flabel, key=f"mc_filter_btn_{fkey}"):
+            st.session_state.mc_table_filter = fkey
+    if st.session_state.mc_table_filter:
+        st.caption(f"Filtering: **{st.session_state.mc_table_filter}** -- click 'Show all' to clear.")
+
+    # --- Step 4 (Task E): fixed running scoreboard, now excluding manager-closed issues ---
+    resolved_so_far = mc_issues[
+        (mc_issues["Resolution_Date"] > project_start) & (mc_issues["Resolution_Date"] <= T)
+        & (~mc_issues["ID"].isin(mc_closed_ids))
+    ]
     if len(resolved_so_far):
         rs_risk = dd.risk_at_time(mc_issues, mc_checkpoints, T).set_index("ID")
         rs_risk_sub = rs_risk.loc[resolved_so_far["ID"]]
@@ -292,40 +488,34 @@ with tab_mc:
         majority_class = int(actual_delayed.mean() >= 0.5)
         majority_correct = int((actual_delayed.values == bool(majority_class)).sum())
         st.info(
-            f"📊 **Running scoreboard (since {MC_START.date()}):** {correct} / {len(resolved_so_far)} "
+            f"📊 **Running scoreboard (since {project_start.date()}):** {correct} / {len(resolved_so_far)} "
             f"resolved issues correctly called ({correct/len(resolved_so_far):.0%} accuracy) · "
             f"predicting '{'delayed' if majority_class else 'on time'}' for everything would score "
-            f"{majority_correct/len(resolved_so_far):.0%}."
+            f"{majority_correct/len(resolved_so_far):.0%}. Manager-closed issues are excluded."
         )
     else:
         st.caption("📊 Running scoreboard: no issues resolved yet since the replay start.")
 
-    # --- Step 3: blocker cascade among overrunning issues ---
-    st.subheader("⛓️ Blocker cascade -- overrunning issues holding up other work")
-    overrunning_ids = [i for i in open_cur_ids if cls_cur.loc[i, "status"] == "overrunning"]
-    cascade_rows = []
-    for oid in overrunning_ids:
-        blocked = [b for b in blocking_graph.get(oid, []) if b in open_cur_ids]
-        if blocked:
-            cascade_rows.append((oid, blocked))
-    cascade_rows.sort(key=lambda r: -len(r[1]))
+    # --- Timeline chart, with in-sample shading (design constraint 3) ---
+    st.subheader("Open-issue volume over time (by status)")
+    timeline = get_mission_control_timeline(project_id, mc_issues, mc_checkpoints, project_start, project_end)
+    fig, ax = plt.subplots(figsize=(11, 3.2))
+    if project_start < TEST_PERIOD_START:
+        shade_end = min(TEST_PERIOD_START, project_end)
+        ax.axvspan(project_start, shade_end, color="grey", alpha=0.15)
+        ax.text(project_start + (shade_end - project_start) / 2, ax.get_ylim()[1] if ax.get_ylim()[1] > 0 else 1,
+                "in-sample -- model trained on this period", fontsize=8, color="#555555",
+                ha="center", va="top")
+    ax.stackplot(timeline["date"], timeline["on_track"], timeline["at_risk"], timeline["overrunning"],
+                 colors=[GREEN, AMBER, RED], alpha=0.6, labels=["On track", "At risk", "Overrunning"])
+    ax.axvline(T, color="black", linewidth=1.5, linestyle="--")
+    ax.axvline(TEST_PERIOD_START, color="#2a78d6", linewidth=1.2, linestyle=":")
+    ax.set_ylabel("Open issues", fontsize=11)
+    ax.legend(fontsize=9, loc="upper left")
+    ax.tick_params(labelsize=9)
+    st.pyplot(fig, clear_figure=True)
 
-    if cascade_rows:
-        title_lookup = mc_issues.set_index("ID")["Title"]
-        overrun_lookup = cls_cur["overrun_multiple"]
-        for oid, blocked in cascade_rows[:5]:
-            mult = overrun_lookup.get(oid, float("nan"))
-            st.markdown(
-                f"🔴 **Issue {fmt_int(oid)}** -- *{title_lookup.get(oid, '')[:70]}* "
-                f"({mult:.1f}x expected duration) blocks **{len(blocked)}** open issue(s):"
-            )
-            for b in blocked:
-                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;↳ Issue {fmt_int(b)} -- *{title_lookup.get(b, '')[:60]}*",
-                            unsafe_allow_html=True)
-    else:
-        st.caption("No overrunning issue currently blocks another open issue in this window.")
-
-    # --- Event feed (Step 5: filtered to significant changes) ---
+    # --- Event feed (moved below the chart, Step 8) ---
     st.subheader("Event feed")
     events = []
     risk_cur_all = cls_cur["risk"]
@@ -334,10 +524,11 @@ with tab_mc:
     newly_created = mc_issues[(mc_issues["Creation_Date"] > T_prev) & (mc_issues["Creation_Date"] <= T)]
     for _, iss in newly_created.iterrows():
         r = risk_cur_all.get(iss["ID"], iss["static_risk"])
-        if r >= RISK_THRESHOLD:  # only NEW HIGH-risk issues are signal
+        if r >= RISK_THRESHOLD:
             events.append((iss["Creation_Date"], f"🆕 Issue {fmt_int(iss['ID'])} created -- initial risk {r:.0%}"))
 
-    resolved_between = mc_issues[(mc_issues["Resolution_Date"] > T_prev) & (mc_issues["Resolution_Date"] <= T)]
+    resolved_between = mc_issues[(mc_issues["Resolution_Date"] > T_prev) & (mc_issues["Resolution_Date"] <= T)
+                                  & (~mc_issues["ID"].isin(mc_closed_ids))]
     for _, iss in resolved_between.iterrows():
         r = risk_cur_all.get(iss["ID"], iss["static_risk"])
         was_delayed = bool(iss["delayed_v2"])
@@ -371,18 +562,66 @@ with tab_mc:
     else:
         st.caption("No significant events this step.")
 
-    # --- Open issues table ---
+    # --- Blocker cascade among overrunning issues ---
+    st.subheader("⛓️ Blocker cascade -- overrunning issues holding up other work")
+    overrunning_ids = [i for i in open_cur_ids if cls_cur.loc[i, "status"] == "overrunning"]
+    cascade_rows = []
+    for oid in overrunning_ids:
+        blocked = [b for b in blocking_graph.get(oid, []) if b in open_cur_ids]
+        if blocked:
+            cascade_rows.append((oid, blocked))
+    cascade_rows.sort(key=lambda r: -len(r[1]))
+
+    if cascade_rows:
+        overrun_lookup = cls_cur["overrun_multiple"]
+        for oid, blocked in cascade_rows[:5]:
+            mult = overrun_lookup.get(oid, float("nan"))
+            st.markdown(
+                f"🔴 **Issue {fmt_int(oid)}** -- *{title_lookup.get(oid, '')[:70]}* "
+                f"({mult:.1f}x expected duration) blocks **{len(blocked)}** open issue(s):"
+            )
+            for b in blocked:
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;↳ Issue {fmt_int(b)} -- *{title_lookup.get(b, '')[:60]}*",
+                            unsafe_allow_html=True)
+    else:
+        st.caption("No overrunning issue currently blocks another open issue in this window.")
+
+    # --- Open issues table, filtered, with transparency columns ---
     st.subheader("Open issues, sorted by risk")
-    if n_open:
-        open_df = mc_issues[mc_issues["ID"].isin(open_cur_ids)].merge(
-            cls_cur.reset_index()[["ID", "risk", "source", "status", "overrun_multiple"]], on="ID", how="left"
+    table_ids = list(open_cur_ids)
+    active_filter = st.session_state.mc_table_filter
+    if active_filter == "past_target":
+        table_ids = [i for i in table_ids if vs_target_cur.get(i) == "past_target"]
+    elif active_filter:
+        table_ids = [i for i in table_ids if cls_cur.loc[i, "status"] == active_filter]
+
+    if table_ids:
+        open_df = mc_issues[mc_issues["ID"].isin(table_ids)].drop(columns=["expected_duration_minutes"]).merge(
+            cls_cur.reset_index()[["ID", "risk", "source", "status", "overrun_multiple",
+                                    "elapsed_minutes", "expected_duration_minutes"]],
+            on="ID", how="left",
         ).sort_values("risk", ascending=False)
-        display_mc = open_df[["ID", "Title", "Type", "Priority", "Assignee_ID", "status", "risk", "source",
-                               "overrun_multiple"]].rename(columns={"risk": "predicted_risk"}).reset_index(drop=True)
+        open_df["vs_target"] = open_df["ID"].map(vs_target_cur)
+        open_df["Open for (days)"] = open_df["elapsed_minutes"] / 1440.0
+        open_df["Expected (days)"] = open_df["expected_duration_minutes"] / 1440.0
+        open_df["Target (days)"] = open_df["Type_Normalized"].astype(str).map(mc_targets)
+
+        display_mc = open_df[["ID", "Title", "Type", "Priority", "Assignee_ID", "status", "vs_target",
+                               "risk", "source", "overrun_multiple", "Open for (days)",
+                               "Expected (days)", "Target (days)"]].rename(
+            columns={"risk": "predicted_risk", "status": "vs_history"}
+        ).reset_index(drop=True)
         display_mc["ID"] = display_mc["ID"].map(fmt_int)
         display_mc["Assignee_ID"] = display_mc["Assignee_ID"].map(fmt_int)
         display_mc["overrun_multiple"] = display_mc["overrun_multiple"].map(
             lambda v: f"{v:.1f}x" if pd.notna(v) else ""
+        )
+        display_mc["Open for (days)"] = display_mc["Open for (days)"].map(lambda v: fmt_num(v, 1))
+        display_mc["Expected (days)"] = display_mc["Expected (days)"].map(
+            lambda v: fmt_num(v, 1) if pd.notna(v) else "insufficient history"
+        )
+        display_mc["Target (days)"] = display_mc["Target (days)"].map(
+            lambda v: fmt_num(v, 1) if pd.notna(v) else "—"
         )
         styled_mc = display_mc.style.map(
             lambda v: f"background-color:{dd.risk_color(v)}33;color:{dd.risk_color(v)};font-weight:600;",
@@ -390,27 +629,88 @@ with tab_mc:
         ).format({"predicted_risk": "{:.0%}"})
         st.dataframe(styled_mc, width="stretch", height=350)
     else:
-        st.caption("No open issues at this date.")
+        st.caption("No open issues match the current filter.")
 
-    # --- Project timeline ---
-    st.subheader("Open-issue volume over time (by status)")
-    timeline = get_mission_control_timeline(MC_PROJECT, mc_issues, mc_checkpoints, MC_START, MC_END)
-    fig, ax = plt.subplots(figsize=(11, 3.2))
-    ax.stackplot(timeline["date"], timeline["on_track"], timeline["at_risk"], timeline["overrunning"],
-                 colors=[GREEN, AMBER, RED], alpha=0.6, labels=["On track", "At risk", "Overrunning"])
-    ax.axvline(T, color="black", linewidth=1.5, linestyle="--")
-    ax.set_ylabel("Open issues", fontsize=11)
-    ax.legend(fontsize=9, loc="upper left")
-    ax.tick_params(labelsize=9)
-    st.pyplot(fig, clear_figure=True)
+    # --- Selected-issue panel: two-signal detail, divergence, close action ---
+    st.subheader("Selected issue")
+    if table_ids:
+        sorted_table_ids = sorted(table_ids, key=lambda i: -cls_cur.loc[i, "risk"])
+        sel_labels = {
+            i: f"{fmt_int(i)} - {title_lookup.get(i, '')[:50]} (risk={cls_cur.loc[i, 'risk']:.0%})"
+            for i in sorted_table_ids
+        }
+        sel_id = st.selectbox(
+            "Select an issue", sorted_table_ids, format_func=lambda i: sel_labels[i],
+            key=f"mc_issue_select_{project_id}_{active_filter}",
+        )
+        vs_hist = cls_cur.loc[sel_id, "status"]
+        vs_tgt = vs_target_cur.get(sel_id, "no_target_set")
+        elapsed_d = cls_cur.loc[sel_id, "elapsed_minutes"] / 1440.0
+        expected_minutes = cls_cur.loc[sel_id, "expected_duration_minutes"]
+        expected_d = expected_minutes / 1440.0 if pd.notna(expected_minutes) else None
+        type_n = str(type_lookup.get(sel_id))
+        target_d = mc_targets.get(type_n)
 
-    if playing and T < MC_END:
+        hist_label = {"overrunning": "Overrunning", "at_risk": "At risk", "on_track": "On track"}[vs_hist]
+        tgt_label = {"past_target": "Past target", "within_target": "Within target",
+                     "no_target_set": "No target set"}[vs_tgt]
+        bcol1, bcol2 = st.columns(2)
+        bcol1.markdown(f"**vs. history:** {hist_label}")
+        bcol2.markdown(f"**vs. target:** {tgt_label}")
+
+        flagged_hist = vs_hist in ("at_risk", "overrunning")
+        flagged_tgt = vs_tgt == "past_target"
+        if vs_tgt != "no_target_set" and flagged_hist != flagged_tgt:
+            exp_txt = f"a typical {expected_d:.0f}" if expected_d is not None else "an unknown"
+            if flagged_tgt and not flagged_hist:
+                st.info(
+                    f"On track by historical pace (day {elapsed_d:.0f} of {exp_txt}), but past your "
+                    f"{target_d:.0f}-day target."
+                )
+            else:
+                st.info(
+                    f"Flagged by historical pace (day {elapsed_d:.0f} of {exp_txt}), but still within "
+                    f"your {target_d:.0f}-day target."
+                )
+
+        st.write(
+            f"**Open for:** {elapsed_d:.1f} days &nbsp;·&nbsp; **Expected:** "
+            f"{f'{expected_d:.1f} days' if expected_d is not None else 'insufficient history'} "
+            f"&nbsp;·&nbsp; **Target:** {f'{target_d:.1f} days' if target_d is not None else '—'}",
+            unsafe_allow_html=True,
+        )
+
+        if st.button("🔒 Close issue", key=f"mc_close_{sel_id}"):
+            st.session_state.mc_closed_ids.add(int(sel_id))
+            st.rerun()
+    else:
+        st.caption("No issue available to select under the current filter.")
+
+    # --- Closed-issues panel (Step 6/8) ---
+    st.subheader("Closed issues (this session)")
+    st.caption("Session-only -- closing or reopening here never modifies the underlying data files.")
+    if mc_closed_ids:
+        closed_df = mc_issues[mc_issues["ID"].isin(mc_closed_ids)][["ID", "Title", "Type"]].copy()
+        closed_df["ID"] = closed_df["ID"].map(fmt_int)
+        st.dataframe(closed_df, width="stretch")
+        reopen_options = sorted(mc_closed_ids)
+        reopen_labels = {i: f"{fmt_int(i)} - {title_lookup.get(i, '')[:50]}" for i in reopen_options}
+        reopen_id = st.selectbox(
+            "Reopen an issue", reopen_options, format_func=lambda i: reopen_labels[i],
+            key=f"mc_reopen_select_{project_id}",
+        )
+        if st.button("Reopen", key=f"mc_reopen_btn_{reopen_id}"):
+            st.session_state.mc_closed_ids.discard(reopen_id)
+            st.rerun()
+    else:
+        st.caption("No issues closed this session.")
+
+    if playing and T < project_end:
         time.sleep(0.7)
-        st.session_state.mc_cursor = min(MC_END, T + step)
+        st.session_state.mc_cursor = min(project_end, T + step)
         st.rerun()
-    elif playing and T >= MC_END:
+    elif playing and T >= project_end:
         st.session_state.mc_playing = False
-
 # ---------------------------------------------------------------------
 # Tab 2: Issue Risk & Explanation (+ folded-in Reassignment, Step 6)
 # ---------------------------------------------------------------------

@@ -1,0 +1,24 @@
+/Users/praxsmacbookair/jupython/capstone/venv/lib/python3.14/site-packages/sklearn/metrics/_classification.py:1879: UndefinedMetricWarning: Precision is ill-defined and being set to 0.0 due to no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", result.shape[0])
+Loading data...
+train=142303  val=20329  train+val=162632  test=40658
+Rows with >=1 NaN assignee feature (train+val+test): 33366
+Logistic regression: validation grid over C...
+  selected {'C': 0.01, 'max_iter': 1000}, val AUC=0.6921
+Random forest: validation grid over max_depth...
+  selected {'max_depth': None, 'n_estimators': 300, 'n_jobs': -1, 'random_state': 0}, val AUC=0.7056
+XGBoost: retraining locked config for a comparable timing measurement...
+LightGBM: validation grid over learning_rate/max_depth...
+  selected {'learning_rate': 0.1, 'max_depth': 6, 'n_estimators': 100, 'verbosity': -1}, val AUC=0.7098
+LightGBM (secondary): XGBoost's exact hyperparameters, library-isolation check...
+MLP: fitting (64,32) with early stopping...
+                                                           model      auc  accuracy_at_0.5  f1_at_0.5  train_seconds
+                                         Majority-class baseline 0.500000         0.529785   0.000000       0.000000
+                                             Logistic regression 0.728638         0.666216   0.636215       0.528024
+                                                   Random forest 0.729692         0.669733   0.631807      32.717381
+                                     XGBoost (tuned, Task B4/B5) 0.743765         0.681194   0.638438       0.436354
+                                                LightGBM (tuned) 0.749193         0.683162   0.645358       0.888997
+LightGBM (XGBoost's exact hyperparams -- library isolation only) 0.740060         0.675906   0.635077       0.364701
+                                                     MLP (64,32) 0.730005         0.672045   0.637091       8.181646
+
+Saved model_comparison/model_comparison.csv and model_comparison/model_comparison.png
