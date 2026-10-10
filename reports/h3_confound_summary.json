@@ -1,0 +1,33 @@
+{
+  "untuned_trees_per_seed": [
+    27,
+    29,
+    29,
+    28,
+    29
+  ],
+  "all": {
+    "total_gap": 0.05532994014200687,
+    "hyperparam_main_effect": -0.0012213462049086576,
+    "data_main_effect": 0.05655128634691553,
+    "interaction": 0.0
+  },
+  "M1": {
+    "total_gap": 0.028782964712372516,
+    "hyperparam_main_effect": -0.0062433927490499475,
+    "data_main_effect": 0.035026357461422464,
+    "interaction": 0.0
+  },
+  "M5": {
+    "total_gap": 0.06283819208070596,
+    "hyperparam_main_effect": -0.002461595292494123,
+    "data_main_effect": 0.06529978737320008,
+    "interaction": 0.0
+  },
+  "M10": {
+    "total_gap": 0.1356599119979316,
+    "hyperparam_main_effect": 0.000867365462066394,
+    "data_main_effect": 0.1347925465358652,
+    "interaction": 0.0
+  }
+}

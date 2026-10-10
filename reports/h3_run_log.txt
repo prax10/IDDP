@@ -1,0 +1,116 @@
+train=943095 val=137008 trainval=1080103 test=262433
+  seed 0: untuned early-stopped at 27 trees
+  seed 1: untuned early-stopped at 29 trees
+  seed 2: untuned early-stopped at 29 trees
+  seed 3: untuned early-stopped at 28 trees
+  seed 4: untuned early-stopped at 29 trees
+
+Test AUC (mean of 5 seeds):
+config       tuned           untuned          
+train_data   train train+val   train train+val
+checkpoint                                    
+all         0.7343    0.7953  0.7399    0.7921
+M1          0.6722    0.7114  0.6826    0.7135
+M2          0.6778    0.7261  0.6908    0.7268
+M3          0.6935    0.7453  0.7018    0.7412
+M4          0.7076    0.7666  0.7123    0.7617
+M5          0.7151    0.7823  0.7195    0.7829
+M6          0.7292    0.8087  0.7350    0.8057
+M7          0.7340    0.8221  0.7353    0.8210
+M8          0.7313    0.8334  0.7332    0.8322
+M9          0.7261    0.8460  0.7295    0.8438
+M10         0.7166    0.8579  0.7222    0.8506
+
+Test accuracy @0.5 (mean of 5 seeds):
+config       tuned           untuned          
+train_data   train train+val   train train+val
+checkpoint                                    
+all         0.7081    0.7205  0.7090    0.7148
+M1          0.5784    0.5913  0.5821    0.5987
+M2          0.6170    0.6262  0.6178    0.6250
+M3          0.6464    0.6555  0.6468    0.6500
+M4          0.6827    0.6932  0.6828    0.6860
+M5          0.7191    0.7317  0.7193    0.7232
+M6          0.7475    0.7636  0.7475    0.7513
+M7          0.7748    0.7908  0.7753    0.7801
+M8          0.7987    0.8149  0.7995    0.8045
+M9          0.8195    0.8347  0.8205    0.8242
+M10         0.8403    0.8484  0.8407    0.8429
+  bootstrap done: all
+  bootstrap done: M1
+  bootstrap done: M2
+  bootstrap done: M3
+  bootstrap done: M4
+  bootstrap done: M5
+  bootstrap done: M6
+  bootstrap done: M7
+  bootstrap done: M8
+  bootstrap done: M9
+  bootstrap done: M10
+
+AUC decomposition (A - B, 95% CI) | accuracy diff:
+  [all]
+    hyperparams | data=train       -0.0056 [-0.0060, -0.0052]  acc -0.0009 [-0.0012, -0.0006]  B better (CI < 0)
+    hyperparams | data=train+val   +0.0032 [+0.0028, +0.0035]  acc +0.0057 [+0.0053, +0.0062]  A better (CI > 0)
+    data | config=untuned          +0.0521 [+0.0509, +0.0533]  acc +0.0058 [+0.0054, +0.0062]  A better (CI > 0)
+    data | config=tuned            +0.0610 [+0.0595, +0.0622]  acc +0.0124 [+0.0120, +0.0129]  A better (CI > 0)
+    ORIGINAL confounded gap        +0.0553 [+0.0539, +0.0566]  acc +0.0115 [+0.0110, +0.0120]  A better (CI > 0)
+  [M1]
+    hyperparams | data=train       -0.0104 [-0.0117, -0.0091]  acc -0.0037 [-0.0049, -0.0024]  B better (CI < 0)
+    hyperparams | data=train+val   -0.0021 [-0.0032, -0.0008]  acc -0.0074 [-0.0089, -0.0059]  B better (CI < 0)
+    data | config=untuned          +0.0309 [+0.0287, +0.0330]  acc +0.0166 [+0.0149, +0.0183]  A better (CI > 0)
+    data | config=tuned            +0.0392 [+0.0366, +0.0417]  acc +0.0129 [+0.0113, +0.0145]  A better (CI > 0)
+    ORIGINAL confounded gap        +0.0288 [+0.0262, +0.0313]  acc +0.0092 [+0.0075, +0.0111]  A better (CI > 0)
+  [M3]
+    hyperparams | data=train       -0.0083 [-0.0096, -0.0068]  acc -0.0004 [-0.0013, +0.0006]  B better (CI < 0)
+    hyperparams | data=train+val   +0.0042 [+0.0028, +0.0055]  acc +0.0056 [+0.0044, +0.0067]  A better (CI > 0)
+    data | config=untuned          +0.0394 [+0.0367, +0.0423]  acc +0.0032 [+0.0021, +0.0045]  A better (CI > 0)
+    data | config=tuned            +0.0519 [+0.0483, +0.0553]  acc +0.0091 [+0.0078, +0.0105]  A better (CI > 0)
+    ORIGINAL confounded gap        +0.0436 [+0.0405, +0.0468]  acc +0.0088 [+0.0074, +0.0101]  A better (CI > 0)
+  [M5]
+    hyperparams | data=train       -0.0044 [-0.0057, -0.0032]  acc -0.0003 [-0.0009, +0.0005]  B better (CI < 0)
+    hyperparams | data=train+val   -0.0005 [-0.0017, +0.0006]  acc +0.0085 [+0.0072, +0.0099]  equivalent (CI within +/-0.01)
+    data | config=untuned          +0.0634 [+0.0592, +0.0680]  acc +0.0039 [+0.0030, +0.0048]  A better (CI > 0)
+    data | config=tuned            +0.0672 [+0.0627, +0.0723]  acc +0.0126 [+0.0113, +0.0140]  A better (CI > 0)
+    ORIGINAL confounded gap        +0.0628 [+0.0585, +0.0677]  acc +0.0124 [+0.0109, +0.0138]  A better (CI > 0)
+  [M10]
+    hyperparams | data=train       -0.0056 [-0.0073, -0.0040]  acc -0.0004 [-0.0009, +0.0002]  B better (CI < 0)
+    hyperparams | data=train+val   +0.0073 [+0.0058, +0.0088]  acc +0.0056 [+0.0045, +0.0067]  A better (CI > 0)
+    data | config=untuned          +0.1283 [+0.1203, +0.1368]  acc +0.0022 [+0.0013, +0.0031]  A better (CI > 0)
+    data | config=tuned            +0.1413 [+0.1326, +0.1501]  acc +0.0082 [+0.0069, +0.0094]  A better (CI > 0)
+    ORIGINAL confounded gap        +0.1357 [+0.1272, +0.1447]  acc +0.0078 [+0.0065, +0.0091]  A better (CI > 0)
+
+Main-effect split of the original gap:
+{
+  "untuned_trees_per_seed": [
+    27,
+    29,
+    29,
+    28,
+    29
+  ],
+  "all": {
+    "total_gap": 0.05532994014200687,
+    "hyperparam_main_effect": -0.0012213462049086576,
+    "data_main_effect": 0.05655128634691553,
+    "interaction": 0.0
+  },
+  "M1": {
+    "total_gap": 0.028782964712372516,
+    "hyperparam_main_effect": -0.0062433927490499475,
+    "data_main_effect": 0.035026357461422464,
+    "interaction": 0.0
+  },
+  "M5": {
+    "total_gap": 0.06283819208070596,
+    "hyperparam_main_effect": -0.002461595292494123,
+    "data_main_effect": 0.06529978737320008,
+    "interaction": 0.0
+  },
+  "M10": {
+    "total_gap": 0.1356599119979316,
+    "hyperparam_main_effect": 0.000867365462066394,
+    "data_main_effect": 0.1347925465358652,
+    "interaction": 0.0
+  }
+}
