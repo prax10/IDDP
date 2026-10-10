@@ -1,0 +1,47 @@
+checkpoint rows: 1342536
+  fixed 14 two-digit-year comment dates
+  comments: mean per row 0.97, rows with >=1: 0.347
+  status_bucket distribution:
+status_bucket
+todo           0.718
+review         0.109
+in_progress    0.094
+testing        0.029
+done           0.027
+waiting        0.012
+other          0.006
+reopened       0.004
+saved (1342536, 20) -> data/features/phase8_activity_features.csv
+
+|corr| with delayed_v2 (pooled rows):
+log_min_since_last_change      0.325
+log_min_since_last_activity    0.319
+log_min_since_last_comment     0.309
+ever_in_review                 0.251
+ever_in_progress               0.214
+n_transitions                  0.211
+comments_last_7d               0.174
+n_comment_authors              0.124
+n_comments                     0.110
+log_desc_len                   0.060
+n_back_moves                   0.051
+project_resolved_30d           0.036
+n_reopens                      0.021
+desc_has_code                  0.007
+project_open_at_T              0.006
+log_title_len                  0.004
+assignee_open_at_T             0.000
+
+delay rate by status_bucket:
+                mean    size
+status_bucket               
+done           0.762   36818
+in_progress    0.605  126777
+other          0.621    8371
+reopened       0.682    5223
+review         0.426  146435
+testing        0.471   39142
+todo           0.784  964185
+waiting        0.618   15585
+
+Leakage test: PASS (no event at/after T; max |corr| 0.325)

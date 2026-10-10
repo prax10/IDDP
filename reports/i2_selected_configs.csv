@@ -1,0 +1,5 @@
+variant,learning_rate,max_depth,n_estimators,val_auc,half_life_years,num_leaves
+A_baseline,0.05,8.0,29,0.7040336150357657,,
+B_activity,0.05,8.0,32,0.7620172450997176,,
+C_activity_recency,0.05,8.0,32,0.7641505545610684,4.0,
+D_lightgbm,0.03,,28,0.7649042312500479,,255.0
