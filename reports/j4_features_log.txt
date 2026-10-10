@@ -1,0 +1,46 @@
+rows: 1342536
+  A: reassignment rows with >=1 change 0.260
+  B: in sprint at T 0.129; matched to Sprint table 0.063
+  C: story point history rows 0.064
+  D: field churn done
+  E: known-at-T rates done
+  F: rows already past project median: 0.089
+saved (1342536, 35) -> data/features/phase8_change_history_features.csv
+
+|corr| with delayed_v2:
+log_elapsed_over_median        0.317
+log_min_since_assign_change    0.282
+log_min_to_first_assign        0.212
+past_median                    0.197
+reporter_rate_known            0.179
+n_field_chg_last_7d            0.176
+sp_at_T                        0.176
+assignee_rate_known            0.164
+assigned_at_T                  0.136
+n_assignee_changes             0.124
+assignee_n_known               0.120
+n_estimate_chg                 0.118
+sprint_started                 0.100
+proj_rate_known_90d            0.099
+proj_rate_known                0.093
+n_fixver_chg                   0.072
+n_field_chg_total              0.059
+in_sprint_at_T                 0.058
+ever_reassigned                0.058
+n_label_chg                    0.053
+n_priority_chg                 0.042
+proj_n_resolved_90d            0.038
+n_sprint_changes               0.034
+n_sp_changes                   0.033
+sprint_len_days                0.028
+sprint_overdue                 0.026
+n_component_chg                0.024
+n_epic_chg                     0.019
+n_sprint_carryovers            0.010
+days_to_sprint_end             0.008
+n_rank_chg                     0.007
+n_type_chg                     0.004
+n_link_chg                     0.001
+
+delay rate when past_median=1: 1.0  (must be 1.0 by construction)
+Leakage test: PASS

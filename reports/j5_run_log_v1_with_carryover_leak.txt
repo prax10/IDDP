@@ -1,0 +1,62 @@
+  issues loaded
+  comments + status history loaded
+  change logs loaded
+  FeatureEngine ready
+sprint-tracked issues: 75490; usable (closed, matched, dated): 31029; spill rate 0.464
+        rows  issues  sprints     spill
+split                                  
+test   13719    3785      720  0.687222
+train  71891   21344     2517  0.585386
+val     8919    2483      360  0.678551
+           size   mean
+progress              
+0.00      27612  0.521
+0.25      25101  0.573
+0.50      22627  0.636
+0.75      19189  0.750
+  {'learning_rate': 0.05, 'max_depth': 4}: val 0.7932
+  {'learning_rate': 0.05, 'max_depth': 6}: val 0.7981
+  {'learning_rate': 0.05, 'max_depth': 8}: val 0.7977
+  {'learning_rate': 0.1, 'max_depth': 4}: val 0.7922
+  {'learning_rate': 0.1, 'max_depth': 6}: val 0.7905
+  {'learning_rate': 0.1, 'max_depth': 8}: val 0.7934
+
+Scrum mode, test:
+                model progress       N  pos_rate    auc  accuracy  majority_accuracy  balanced_accuracy     f1  brier  acc_prior_thr  bal_acc_prior_thr
+team_history_baseline      all 13719.0    0.6872 0.6008    0.6772             0.6872             0.5176 0.8008 0.2143            NaN                NaN
+            scrum_xgb      all 13719.0    0.6872 0.7523    0.7275             0.6872             0.6609 0.8088 0.1809            NaN                NaN
+team_history_baseline      0.0  3785.0    0.6227 0.5773    0.6042             0.6227             0.5118 0.7365 0.2361            NaN                NaN
+            scrum_xgb      0.0  3785.0    0.6227 0.7257    0.6829             0.6227             0.6533 0.7524 0.2023         0.6875             0.6558
+team_history_baseline     0.25  3572.0    0.6599 0.5768    0.6540             0.6599             0.5169 0.7829 0.2257            NaN                NaN
+            scrum_xgb     0.25  3572.0    0.6599 0.7403    0.7067             0.6599             0.6628 0.7827 0.1918         0.7052             0.6616
+team_history_baseline      0.5  3355.0    0.7025 0.5830    0.6966             0.7025             0.5148 0.8169 0.2099            NaN                NaN
+            scrum_xgb      0.5  3355.0    0.7025 0.7427    0.7353             0.7025             0.6570 0.8187 0.1795         0.7314             0.6618
+team_history_baseline     0.75  3007.0    0.7838 0.5779    0.7752             0.7838             0.5090 0.8721 0.1782            NaN                NaN
+            scrum_xgb     0.75  3007.0    0.7838 0.7670    0.7996             0.7838             0.6276 0.8792 0.1425         0.7848             0.6600
+
+XGB minus team-history baseline:
+progress  d_auc  d_auc_lo  d_auc_hi
+     all 0.1515    0.1417    0.1613
+     0.0 0.1485    0.1307    0.1661
+    0.25 0.1635    0.1447    0.1824
+     0.5 0.1597    0.1397    0.1815
+    0.75 0.1892    0.1641    0.2150
+
+Top features:
+n_sprint_changes               0.1336
+log_min_since_last_activity    0.0995
+log_min_since_last_change      0.0992
+log_min_since_assign_change    0.0384
+Project_cat                    0.0348
+status_bucket                  0.0289
+carried_in                     0.0276
+assignee_n_known               0.0276
+n_sprint_carryovers            0.0246
+days_left                      0.0232
+progress_actual                0.0211
+log_min_since_last_comment     0.0206
+team_spill_rate_known          0.0188
+n_field_chg_last_7d            0.0184
+issue_age_days                 0.0170
+
+selected config {'learning_rate': 0.05, 'max_depth': 6, 'n_estimators': 126}; thresholds {'0.0': 0.4932306645204414, '0.25': 0.5030151291400536, '0.5': 0.5317290006843332, '0.75': 0.5860435682665563}
