@@ -1,0 +1,92 @@
+=== 1. Exposure to censoring (issue level) ===
+            n  safe_share  delay_rate_safe  delay_rate_atrisk
+split                                                        
+test    40658       0.595            0.501              0.425
+train  142303       0.999            0.501              0.405
+val     20329       0.892            0.505              0.392
+
+=== 2. Fitting models (3 seeds each) ===
+
+=== 2. Test AUC by censoring subset ===
+model              baseline|train  baseline|tv  static|tv  v4|train   v4|tv  v4|tv_safe_only
+test_subset scope                                                                           
+all         M1             0.6683       0.7054     0.7295    0.7646  0.7936           0.7793
+            M10            0.7289       0.8621     0.7418    0.7850  0.8957           0.8589
+            M3             0.6975       0.7450     0.7253    0.7835  0.8233           0.8045
+            M5             0.7202       0.7871     0.7297    0.7988  0.8526           0.8307
+            all            0.7387       0.7963     0.7285    0.8051  0.8568           0.8358
+at_risk     M1             0.6358       0.7015     0.7289    0.7340  0.7869           0.7570
+            M10            0.6559       0.8928     0.7652    0.7173  0.9189           0.8530
+            M3             0.6612       0.7477     0.7272    0.7535  0.8250           0.7879
+            M5             0.6714       0.7970     0.7336    0.7646  0.8637           0.8227
+            all            0.6978       0.8059     0.7336    0.7698  0.8659           0.8256
+safe        M1             0.6910       0.7050     0.7283    0.7885  0.7982           0.7970
+            M10            0.8052       0.8316     0.7164    0.8571  0.8725           0.8718
+            M3             0.7261       0.7402     0.7219    0.8106  0.8223           0.8211
+            M5             0.7618       0.7772     0.7244    0.8318  0.8438           0.8428
+            all            0.7734       0.7869     0.7223    0.8379  0.8496           0.8484
+
+rows / delay rate per subset:
+test_subset scope      N  pos_rate
+        all   all 262433     0.700
+        all    M1  34398     0.556
+        all    M3  29838     0.638
+        all    M5  26279     0.713
+        all   M10  20236     0.839
+       safe   all 158909     0.733
+       safe    M1  20602     0.589
+       safe    M3  17977     0.672
+       safe    M5  15894     0.747
+       safe   M10  12394     0.870
+    at_risk   all 103524     0.648
+    at_risk    M1  13796     0.507
+    at_risk    M3  11861     0.586
+    at_risk    M5  10385     0.661
+    at_risk   M10   7842     0.789
+
+=== 3. Key contrasts with 95% CIs ===
+  [all     all] v4 minus static                +0.1283 [+0.1264, +0.1302]
+  [all     all] baseline-dynamic minus static  +0.0678 [+0.0662, +0.0695]
+  [all     all] val-data effect (baseline)     +0.0577 [+0.0564, +0.0590]
+  [all     all] val-data effect (v4)           +0.0517 [+0.0506, +0.0530]
+  [all     all] v4 minus baseline-dynamic      +0.0604 [+0.0590, +0.0617]
+  [all     M1 ] v4 minus static                +0.0641 [+0.0590, +0.0688]
+  [all     M1 ] baseline-dynamic minus static  -0.0242 [-0.0271, -0.0208]
+  [all     M1 ] val-data effect (baseline)     +0.0371 [+0.0345, +0.0394]
+  [all     M1 ] val-data effect (v4)           +0.0291 [+0.0271, +0.0311]
+  [all     M1 ] v4 minus baseline-dynamic      +0.0883 [+0.0835, +0.0927]
+  [all     M10] v4 minus static                +0.1538 [+0.1449, +0.1625]
+  [all     M10] baseline-dynamic minus static  +0.1203 [+0.1125, +0.1277]
+  [all     M10] val-data effect (baseline)     +0.1332 [+0.1246, +0.1425]
+  [all     M10] val-data effect (v4)           +0.1107 [+0.1034, +0.1190]
+  [all     M10] v4 minus baseline-dynamic      +0.0336 [+0.0291, +0.0374]
+  [safe    all] v4 minus static                +0.1273 [+0.1246, +0.1301]
+  [safe    all] baseline-dynamic minus static  +0.0646 [+0.0623, +0.0669]
+  [safe    all] val-data effect (baseline)     +0.0135 [+0.0126, +0.0143]
+  [safe    all] val-data effect (v4)           +0.0117 [+0.0110, +0.0123]
+  [safe    all] v4 minus baseline-dynamic      +0.0627 [+0.0608, +0.0647]
+  [safe    M1 ] v4 minus static                +0.0699 [+0.0634, +0.0763]
+  [safe    M1 ] baseline-dynamic minus static  -0.0233 [-0.0272, -0.0199]
+  [safe    M1 ] val-data effect (baseline)     +0.0140 [+0.0120, +0.0163]
+  [safe    M1 ] val-data effect (v4)           +0.0098 [+0.0083, +0.0113]
+  [safe    M1 ] v4 minus baseline-dynamic      +0.0932 [+0.0868, +0.0996]
+  [safe    M10] v4 minus static                +0.1561 [+0.1437, +0.1684]
+  [safe    M10] baseline-dynamic minus static  +0.1152 [+0.1043, +0.1252]
+  [safe    M10] val-data effect (baseline)     +0.0264 [+0.0214, +0.0318]
+  [safe    M10] val-data effect (v4)           +0.0153 [+0.0122, +0.0184]
+  [safe    M10] v4 minus baseline-dynamic      +0.0409 [+0.0336, +0.0482]
+  [at_risk all] v4 minus static                +0.1323 [+0.1289, +0.1350]
+  [at_risk all] baseline-dynamic minus static  +0.0723 [+0.0692, +0.0750]
+  [at_risk all] val-data effect (baseline)     +0.1081 [+0.1054, +0.1107]
+  [at_risk all] val-data effect (v4)           +0.0962 [+0.0937, +0.0986]
+  [at_risk all] v4 minus baseline-dynamic      +0.0600 [+0.0578, +0.0621]
+  [at_risk M1 ] v4 minus static                +0.0580 [+0.0510, +0.0661]
+  [at_risk M1 ] baseline-dynamic minus static  -0.0273 [-0.0318, -0.0226]
+  [at_risk M1 ] val-data effect (baseline)     +0.0657 [+0.0602, +0.0708]
+  [at_risk M1 ] val-data effect (v4)           +0.0529 [+0.0489, +0.0572]
+  [at_risk M1 ] v4 minus baseline-dynamic      +0.0854 [+0.0787, +0.0926]
+  [at_risk M10] v4 minus static                +0.1537 [+0.1399, +0.1656]
+  [at_risk M10] baseline-dynamic minus static  +0.1276 [+0.1155, +0.1384]
+  [at_risk M10] val-data effect (baseline)     +0.2368 [+0.2207, +0.2531]
+  [at_risk M10] val-data effect (v4)           +0.2016 [+0.1873, +0.2166]
+  [at_risk M10] v4 minus baseline-dynamic      +0.0262 [+0.0196, +0.0320]
