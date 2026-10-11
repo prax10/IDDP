@@ -80,6 +80,15 @@ class Backend:
             titles = pd.Series(dtype=str)
         self.titles = titles.astype(str).str.strip('"')
         self._scrum_pop = None
+        # Task L5: conformal calibration (late / on-time sets) and CQR "how long" intervals
+        try:
+            self.conf = json.load(open(f"{MODELS_DIR}/conformal_calibration.json"))
+            self.cqr = joblib.load(f"{MODELS_DIR}/xgb_regression_rrd_cqr80_trainonly.joblib")
+            sp = pd.read_csv("data/features/phase8_split.csv", usecols=["ID", "split"]).set_index("ID")["split"]
+            st = self.static[["Project_ID", "Resolution_Time_Minutes"]].join(sp)
+            self.proj_median_min = st[st["split"].isin(["train", "val"])].groupby("Project_ID")["Resolution_Time_Minutes"].median()
+        except FileNotFoundError:
+            self.conf, self.cqr = None, None
 
     # ------------------------------------------------------------------ helpers
     def _design(self, ids, T):
@@ -117,6 +126,33 @@ class Backend:
             out.append([(friendly("text_pc_0") if n == "__text__" else friendly(n), float(v)) for n, v in top.items()])
         return out, C
 
+    def confidence(self, risk):
+        """90% Mondrian conformal set -> 'confident: late' / 'confident: on time' / 'uncertain'."""
+        if self.conf is None:
+            return np.full(len(risk), "")
+        c = self.conf["flow_mondrian"]
+        late_in = (1 - risk) <= c["q_late"]
+        on_in = risk <= c["q_on_time"]
+        return np.where(late_in & ~on_in, "confident: late",
+                        np.where(on_in & ~late_in, "confident: on time", "uncertain"))
+
+    def finish_interval(self, X, project_ids, level=80):
+        """CQR interval for days REMAINING until resolution (floored at 0)."""
+        if self.cqr is None:
+            n = len(X)
+            return np.full(n, np.nan), np.full(n, np.nan)
+        Q = np.sort(self.cqr.predict(X[self.cols]), axis=1)
+        adj = self.conf[f"cqr_{level}"]["adjustment_log2"]
+        med_days = pd.Series(project_ids).map(self.proj_median_min).astype(float).to_numpy() / 1440
+        el = X["elapsed_minutes"].to_numpy() / 1440
+        lo = np.maximum(med_days * 2 ** (Q[:, 0] - adj) - el, 0)
+        hi = np.maximum(med_days * 2 ** (Q[:, 1] + adj) - el, 0)
+        return lo, hi
+
+    def recommend(self, issue_id, date):
+        from recommender import recommend
+        return recommend(self, issue_id, date)
+
     # ------------------------------------------------------------------ portfolio
     def projects(self):
         iss = self.fe.iss
@@ -143,8 +179,12 @@ class Backend:
             "flag": np.where(X["past_median"].to_numpy() == 1, "already overdue",
                              np.where(risk >= thr, "likely late", "on track")),
             "overdue": X["past_median"].to_numpy() == 1,
+            "confidence": self.confidence(risk),
             "why": [", ".join(f"{n} ({'↑' if v > 0 else '↓'})" for n, v in r) for r in reasons],
         })
+        lo, hi = self.finish_interval(X, np.full(len(ids), project))
+        df["finish_in"] = [f"{a:.0f}–{b:.0f} days" if np.isfinite(a) else "" for a, b in zip(lo, hi)]
+        df["finish_lo"], df["finish_hi"] = lo, hi
         res = iss["r_s"].reindex(ids).to_numpy()
         df["actually_late"] = np.where(res < FAR, (self.static.reindex(ids)["delayed_v2"].to_numpy()), np.nan)
         return df.sort_values("risk", ascending=False).reset_index(drop=True)

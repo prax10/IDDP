@@ -63,6 +63,20 @@ class ScrumBackend:
         self.cols = self.meta["features"]
         self.cats = self.meta.get("categories", {})
         self.pop = build_population(fe)
+        try:   # Task L5: split-conformal residual quantiles of the per-sprint spill count
+            self.spill_q = json.load(open(f"{MODELS_DIR}/conformal_calibration.json"))["scrum_sprint_count"]
+        except (FileNotFoundError, KeyError):
+            self.spill_q = None
+
+    def spill_interval(self, expected_open, n_open, removed, progress):
+        """90% interval for the number of committed issues that will spill (Task L5)."""
+        if self.spill_q is None:
+            return None
+        key = min(self.spill_q, key=lambda p: abs(float(p) - progress))
+        q = self.spill_q[key]
+        lo = np.clip(np.floor(expected_open + q["residual_q05"]), 0, n_open)
+        hi = np.clip(np.ceil(expected_open + q["residual_q95"]), 0, n_open)
+        return int(lo + removed), int(hi + removed)
 
     # ------------------------------------------------------------------ core scoring
     def _score(self, r):
@@ -132,6 +146,7 @@ class ScrumBackend:
         reasons, _ = self._reasons(r)
         thr = self._thr(kpi["progress"])
         kpi["expected_spills"] = float(r["risk"].sum() + len(removed))   # removed-and-open issues have spilled
+        kpi["spill_interval"] = self.spill_interval(float(r["risk"].sum()), len(open_), len(removed), kpi["progress"])
         kpi["flagged"] = int((r["risk"] >= thr).sum())
         tbl = pd.DataFrame({
             "Issue_ID": r["Issue_ID"].to_numpy(), "Title": self.titles.reindex(r["Issue_ID"]).fillna("").to_numpy(),

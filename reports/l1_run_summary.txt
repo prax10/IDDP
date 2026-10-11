@@ -1,0 +1,43 @@
+train trajectories (>=1 valid checkpoint): 115176; median length 10
+numba DTW matches dtaidistance on 200 random pairs
+
+A. published 4 medoids -> full training population (115176 issues): cluster_1 89.2%, cluster_2 9.3%, cluster_3 0.2%, cluster_4 1.3%
+
+B. complete-linkage hierarchical (published method), K=4, on different samples:
+   n= 4000 seed=1: sizes [0.9668, 0.023, 0.0078, 0.0025]
+   n= 4000 seed=2: sizes [0.968, 0.0138, 0.0115, 0.0068]
+   n= 4000 seed=3: sizes [0.9275, 0.0555, 0.0125, 0.0045]
+   n= 8000 seed=1: sizes [0.9606, 0.0255, 0.0111, 0.0028]
+   n=12000 seed=1: sizes [0.9678, 0.0188, 0.0117, 0.0018]
+
+C. CLARA k-medoids, variant = level (log1p stall)
+   K=2: full-pop cost 146,614; sizes [0.8632, 0.1368]
+   K=3: full-pop cost 124,250; sizes [0.8066, 0.1821, 0.0113]
+   K=4: full-pop cost 103,582; sizes [0.6458, 0.2694, 0.0733, 0.0115]
+   K=5: full-pop cost 94,490; sizes [0.4961, 0.3581, 0.1197, 0.0197, 0.0065]
+   K=6: full-pop cost 86,713; sizes [0.3679, 0.359, 0.184, 0.0656, 0.0157, 0.0078]
+   K=7: full-pop cost 84,352; sizes [0.4647, 0.2684, 0.1877, 0.046, 0.0135, 0.012, 0.0077]
+   K=8: full-pop cost 77,141; sizes [0.4082, 0.2594, 0.1889, 0.0852, 0.0274, 0.0116, 0.0116, 0.0077]
+
+C. CLARA k-medoids, variant = shape (z-normalised)
+   K=2: full-pop cost 86,389; sizes [0.7894, 0.2106]
+   K=3: full-pop cost 69,657; sizes [0.7593, 0.1243, 0.1164]
+   K=4: full-pop cost 61,010; sizes [0.7107, 0.1122, 0.1025, 0.0747]
+   K=5: full-pop cost 57,614; sizes [0.6939, 0.0989, 0.085, 0.0745, 0.0477]
+   K=6: full-pop cost 53,597; sizes [0.6588, 0.0849, 0.0802, 0.0744, 0.0559, 0.0458]
+   K=7: full-pop cost 52,825; sizes [0.5868, 0.1396, 0.0754, 0.073, 0.0571, 0.0393, 0.0287]
+   K=8: full-pop cost 50,437; sizes [0.6574, 0.075, 0.0621, 0.0575, 0.0532, 0.0412, 0.0388, 0.0149]
+
+   elbow (level (log1p stall)): K=4; sizes [0.6458, 0.2694, 0.0733, 0.0115]
+
+   elbow (shape (z-normalised)): K=3; sizes [0.7593, 0.1243, 0.1164]
+
+Cluster profiles (chosen K):
+             variant  cluster  share  delay_rate
+ level (log1p stall)        1  0.269       0.722
+ level (log1p stall)        2  0.646       0.537
+ level (log1p stall)        3  0.011       0.678
+ level (log1p stall)        4  0.073       0.666
+shape (z-normalised)        1  0.116       0.438
+shape (z-normalised)        2  0.759       0.711
+shape (z-normalised)        3  0.124       0.057

@@ -95,7 +95,10 @@ class _Events:
 
 
 class FeatureEngine:
-    def __init__(self, verbose=True):
+    def __init__(self, verbose=True, raw_dir=None, features_dir=None):
+        """raw_dir / features_dir default to the TAWOS caches; Task L4 points them at an external dataset."""
+        RAW_DIR = raw_dir or globals()["RAW_DIR"]
+        FEATURES_DIR = features_dir or globals()["FEATURES_DIR"]
         log = print if verbose else (lambda *a, **k: None)
         iss = pd.read_csv(_first(f"{RAW_DIR}/issue_slim.csv.gz", "data/stage_tmp/issue_slim.csv.gz"))
         iss["c_s"] = secs(iss["Creation_Date"])

@@ -1,0 +1,25 @@
+{
+  "old medoids, M3..Mt (as published)": {
+    "cluster_1": 0.863,
+    "cluster_2": 0.113,
+    "cluster_4": 0.021,
+    "cluster_3": 0.003
+  },
+  "old medoids, M1..Mt (fixed)": {
+    "cluster_1": 0.884,
+    "cluster_2": 0.092,
+    "cluster_4": 0.019,
+    "cluster_3": 0.006
+  },
+  "full-scale level medoids (K=4)": {
+    "cluster_2": 0.666,
+    "cluster_1": 0.239,
+    "cluster_4": 0.077,
+    "cluster_3": 0.018
+  },
+  "full-scale shape medoids (K=3)": {
+    "cluster_2": 0.874,
+    "cluster_1": 0.095,
+    "cluster_3": 0.031
+  }
+}

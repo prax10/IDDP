@@ -33,6 +33,11 @@ from scrum_backend import ScrumBackend
 
 st.set_page_config(page_title="Delay Radar v5", layout="wide", page_icon="📡")
 RED, BLUE, GREY = "#d1495b", "#2a78d6", "#898781"
+RECO_NOTE = ("Each row re-scores this issue with one thing changed (e.g. status moved to review): the model's "
+             "estimate of how its risk would move, not a guaranteed causal effect. Checked against history "
+             "(test period, issues still open a week later, matched on risk): every action points the same way "
+             "in real outcomes, but status moves (start work / review) are overstated about 2x, reassignment is "
+             "about right, and commenting is understated.")
 
 
 @st.cache_resource(show_spinner="Loading change history and models (first run takes ~1 minute)...")
@@ -82,15 +87,24 @@ def flow_mode():
             st.info("No open issues on this date.")
         else:
             late = (df["flag"] == "likely late").sum()
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("Open issues", f"{len(df_all):,}")
             c2.metric("Already overdue", f"{int(df_all['overdue'].sum()):,}")
             c3.metric("Flagged likely late", f"{late:,}", f"{late / max((~df['overdue']).sum(), 1):.0%} of not-yet-overdue")
-            c4.metric("Median age (days)", f"{df['age_days'].median():.0f}")
-            cols = ["Issue_ID", "Title", "stage", "age_days", "risk", "flag", "why"] + (["actually_late"] if show_truth else [])
+            c4.metric("Confident late calls", f"{(df['confidence'] == 'confident: late').sum():,}",
+                      help="Issues whose 90% conformal prediction set contains only 'late'. On held-out test data "
+                           "the sets contain the true outcome ~92% of the time, and a 'confident: late' call on a not-yet-"
+                           "overdue issue was right ~96% of the time. 'Uncertain' means the model cannot rule either "
+                           "outcome out at that level.")
+            c5.metric("Median age (days)", f"{df['age_days'].median():.0f}")
+            cols = ["Issue_ID", "Title", "stage", "age_days", "risk", "flag", "confidence", "finish_in", "why"] + \
+                   (["actually_late"] if show_truth else [])
             st.dataframe(df[cols], width="stretch", hide_index=True, column_config={
                 "risk": st.column_config.ProgressColumn("risk", min_value=0.0, max_value=1.0, format="%.2f"),
                 "age_days": st.column_config.NumberColumn("age (days)", format="%.0f"),
+                "finish_in": st.column_config.TextColumn("likely done in (80% range)",
+                                                         help="Conformalised quantile regression; on test data the "
+                                                              "80% range held the true finish ~84% of the time."),
                 "why": st.column_config.TextColumn("top reasons (↑ raises risk, ↓ lowers)", width="large")})
             if show_truth:
                 d = df.dropna(subset=["actually_late"])
@@ -109,6 +123,11 @@ def flow_mode():
                                format_func=lambda i: f"{i} — {df.set_index('Issue_ID').loc[i, 'Title'][:80]}")
             row = df.set_index("Issue_ID").loc[iid]
             st.subheader(f"Risk {row['risk']:.2f} — {row['flag']}")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Model confidence (90%)", row["confidence"].replace("confident: ", "") if row["confidence"] else "–",
+                      help="From a 90% conformal prediction set calibrated on the validation period.")
+            m2.metric("Likely done in", row["finish_in"] or "–", help="80% range for the days still remaining.")
+            m3.metric("Open for", f"{row['age_days']:.0f} days")
             left, right = st.columns([3, 2])
             with left:
                 traj = b.trajectory(int(iid), pd.Timestamp(date))
@@ -120,9 +139,30 @@ def flow_mode():
                 ex["direction"] = np.where(ex["push"] > 0, "raises risk", "lowers risk")
                 st.dataframe(ex, hide_index=True, width="stretch",
                              column_config={"push": st.column_config.NumberColumn("effect (log-odds)", format="%+.2f")})
+            what_would_help(int(iid), pd.Timestamp(date), row)
 
     with tab_card:
         card("md files/task-J-overnight-summary.md")
+
+
+def what_would_help(iid, date, row):
+    st.markdown("#### What would help?")
+    if row["overdue"]:
+        st.caption("This issue is already past the project's typical duration, so it is late by definition; "
+                   "actions now affect how late, not whether.")
+    try:
+        base, rec = b.recommend(iid, date)
+    except Exception as e:      # never break the page over a recommendation
+        st.caption(f"No recommendations available ({e}).")
+        return
+    if rec.empty:
+        st.caption("No candidate actions for this issue's stage.")
+        return
+    rec = rec.assign(verdict=np.where(rec["change"] <= -0.02, "helps", np.where(rec["change"] >= 0.02, "hurts", "little effect")))
+    st.dataframe(rec, hide_index=True, width="stretch", column_config={
+        "new_risk": st.column_config.ProgressColumn("risk if done", min_value=0.0, max_value=1.0, format="%.2f"),
+        "change": st.column_config.NumberColumn("change", format="%+.2f")})
+    st.caption(RECO_NOTE)
 
 
 # =====================================================================================
@@ -158,8 +198,12 @@ def scrum_mode():
         c[0].metric("Committed", kpi["committed"])
         c[1].metric("Done", kpi["done"])
         c[2].metric("Still open", kpi["open"])
+        iv = kpi.get("spill_interval")
         c[3].metric("Predicted to spill", f"{kpi['expected_spills']:.1f}",
-                    help="Sum of spill risks of open issues, plus issues already moved out unfinished.")
+                    f"90% range {iv[0]}–{iv[1]}" if iv else None, delta_color="off",
+                    help="Sum of spill risks of open issues, plus issues already moved out unfinished. "
+                         "The range is split-conformal, calibrated on validation-period sprints "
+                         "(it held the true count in ~96% of test sprints).")
         c[4].metric("Predicted completion", f"{1 - kpi['expected_spills'] / max(kpi['committed'], 1):.0%}")
         c[5].metric("Days left", f"{max(kpi['days_left'], 0):.1f}")
 
@@ -170,7 +214,7 @@ def scrum_mode():
             proj = pd.DataFrame({"date": [bd["date"].iloc[-1], pd.to_datetime(s["planned_end"], unit="s")],
                                  "open_commitments": [bd["open_commitments"].iloc[-1], kpi["expected_spills"]]})
             fc = alt.Chart(proj).mark_line(color=RED, strokeDash=[6, 4]).encode(x="date:T", y="open_commitments:Q")
-            st.altair_chart((base + fc).properties(height=240), use_container_width=True)
+            st.altair_chart((base + fc).properties(height=240), width="stretch")
             st.caption("Blue: open commitments each day. Red dashed: where the model expects the sprint to end "
                        "(predicted spill count at the planned end).")
 
@@ -226,7 +270,7 @@ def scrum_mode():
             ch = alt.Chart(long).mark_line(point=True).encode(
                 x=alt.X("start_date:T", title="sprint start"), y=alt.Y("spills:Q", title="issues spilled"),
                 color=alt.Color("series:N", scale=alt.Scale(range=[GREY, RED])), tooltip=["name", "series", "spills"])
-            st.altair_chart(ch.properties(height=260), use_container_width=True)
+            st.altair_chart(ch.properties(height=260), width="stretch")
             st.dataframe(h[["name", "start_date", "committed", "spilled", "completion_rate", "predicted_spills"]],
                          hide_index=True, width="stretch", column_config={
                              "completion_rate": st.column_config.NumberColumn("completion", format="percent"),
