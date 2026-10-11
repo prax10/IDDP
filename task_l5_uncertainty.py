@@ -18,6 +18,7 @@ Calibration constants are saved to models/conformal_calibration.json for the app
 """
 
 import json
+import os
 import joblib
 import numpy as np
 import pandas as pd
@@ -29,6 +30,7 @@ from task_i2_model_upgrades import weights
 from task_j4_v5_model import load_all
 
 ALPHA = 0.10
+LIVE = os.environ.get("LIVE", "v5b")
 REG = dict(subsample=0.8, colsample_bytree=0.8, enable_categorical=True, tree_method="hist")
 
 
@@ -39,9 +41,9 @@ def conformal_q(scores, alpha):
 
 def main():
     out, rows = {}, []
-    meta = json.load(open(f"{MODELS_DIR}/xgb_dynamic_live_v5b_meta.json"))
+    meta = json.load(open(f"{MODELS_DIR}/xgb_dynamic_live_{LIVE}_meta.json"))
     cols = meta["features"]
-    cfg = {k: meta["config"][k] for k in ("learning_rate", "max_depth", "n_estimators")}
+    cfg = dict(meta["config"])
     ck = load_all()
     tr, va = ck[ck.split == "train"], ck[ck.split == "val"]
     te = ck[ck.split == "test"].reset_index(drop=True)
@@ -50,7 +52,7 @@ def main():
     # ---------------- 1. Mondrian conformal classification
     pv, pt = [], []
     for s in [0, 1, 2]:
-        m = xgb.XGBClassifier(**cfg, **seeded(s))
+        m = xgb.XGBClassifier(**{**seeded(s), **cfg})
         m.fit(tr[cols], tr[LABEL], sample_weight=w)
         pv.append(m.predict_proba(va[cols])[:, 1])
         pt.append(m.predict_proba(te[cols])[:, 1])
@@ -145,8 +147,8 @@ def main():
         print(rows[-1], flush=True)
 
     res = pd.DataFrame(rows)
-    res.to_csv(f"{REPORTS_DIR}/l5_conformal_coverage.csv", index=False)
-    json.dump(out, open(f"{MODELS_DIR}/conformal_calibration.json", "w"), indent=2)
+    res.to_csv(f"{REPORTS_DIR}/l5_conformal_coverage" + ("" if LIVE == "v5b" else f"_{LIVE}") + ".csv", index=False)
+    json.dump(out, open(f"{MODELS_DIR}/conformal_calibration" + ("" if LIVE == "v5b" else f"_{LIVE}") + ".json", "w"), indent=2)
     pd.set_option("display.width", 250)
     print(res.round(3).to_string(index=False))
 

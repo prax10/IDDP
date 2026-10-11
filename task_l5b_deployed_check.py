@@ -12,6 +12,7 @@ L5 test coverage applies unchanged.)
 """
 
 import json
+import os
 import joblib
 import numpy as np
 import pandas as pd
@@ -20,14 +21,17 @@ from h_common import LABEL, REPORTS_DIR, MODELS_DIR
 from task_j4_v5_model import load_all
 
 
+LIVE = os.environ.get("LIVE", "v5b")
+
+
 def main():
-    conf = json.load(open(f"{MODELS_DIR}/conformal_calibration.json"))
+    conf = json.load(open(f"{MODELS_DIR}/conformal_calibration" + ("" if LIVE == "v5b" else f"_{LIVE}") + ".json"))
     rows = []
 
-    meta = json.load(open(f"{MODELS_DIR}/xgb_dynamic_live_v5b_meta.json"))
+    meta = json.load(open(f"{MODELS_DIR}/xgb_dynamic_live_{LIVE}_meta.json"))
     te = load_all()
     te = te[te.split == "test"].reset_index(drop=True)
-    models = [joblib.load(f"{MODELS_DIR}/xgb_dynamic_live_v5b_seed{s}.joblib") for s in meta["seeds"]]
+    models = [joblib.load(f"{MODELS_DIR}/xgb_dynamic_live_{LIVE}_seed{s}.joblib") for s in meta["seeds"]]
     p = np.mean([m.predict_proba(te[meta["features"]])[:, 1] for m in models], 0)
     y = te[LABEL].to_numpy()
     c = conf["flow_mondrian"]
@@ -64,7 +68,7 @@ def main():
                      "coverage": ((t.A >= lo) & (t.A <= hi)).mean(), "median_width_issues": float(np.median(hi - lo)),
                      "n_test_sprints": len(t), "MAE_point": float((t.A - t.E).abs().mean())})
     res = pd.DataFrame(rows)
-    res.to_csv(f"{REPORTS_DIR}/l5b_deployed_coverage.csv", index=False)
+    res.to_csv(f"{REPORTS_DIR}/l5b_deployed_coverage" + ("" if LIVE == "v5b" else f"_{LIVE}") + ".csv", index=False)
     pd.set_option("display.width", 250)
     print(res.round(3).to_string(index=False))
 

@@ -62,7 +62,12 @@ def _ensemble(prefix, seeds):
 
 
 class Backend:
-    def __init__(self, live_variant="v5b"):
+    def __init__(self, live_variant=None):
+        import os
+        # v6 (Task M re-tune) when present, else v5b
+        if live_variant is None:
+            live_variant = "v6" if os.path.exists(f"{MODELS_DIR}/xgb_dynamic_live_v6_meta.json") else "v5b"
+        self.live_variant = live_variant
         self.fe = FeatureEngine(verbose=False)
         self.live_meta = json.load(open(f"{MODELS_DIR}/xgb_dynamic_live_{live_variant}_meta.json"))
         self.live = _ensemble(f"xgb_dynamic_live_{live_variant}", self.live_meta["seeds"])
@@ -82,7 +87,9 @@ class Backend:
         self._scrum_pop = None
         # Task L5: conformal calibration (late / on-time sets) and CQR "how long" intervals
         try:
-            self.conf = json.load(open(f"{MODELS_DIR}/conformal_calibration.json"))
+            import os
+            cpath = f"{MODELS_DIR}/conformal_calibration_{self.live_variant}.json"
+            self.conf = json.load(open(cpath if os.path.exists(cpath) else f"{MODELS_DIR}/conformal_calibration.json"))
             self.cqr = joblib.load(f"{MODELS_DIR}/xgb_regression_rrd_cqr80_trainonly.joblib")
             sp = pd.read_csv("data/features/phase8_split.csv", usecols=["ID", "split"]).set_index("ID")["split"]
             st = self.static[["Project_ID", "Resolution_Time_Minutes"]].join(sp)

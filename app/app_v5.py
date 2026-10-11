@@ -94,7 +94,7 @@ def flow_mode():
             c4.metric("Confident late calls", f"{(df['confidence'] == 'confident: late').sum():,}",
                       help="Issues whose 90% conformal prediction set contains only 'late'. On held-out test data "
                            "the sets contain the true outcome ~92% of the time, and a 'confident: late' call on a not-yet-"
-                           "overdue issue was right ~96% of the time. 'Uncertain' means the model cannot rule either "
+                           "overdue issue was right ~97% of the time. 'Uncertain' means the model cannot rule either "
                            "outcome out at that level.")
             c5.metric("Median age (days)", f"{df['age_days'].median():.0f}")
             cols = ["Issue_ID", "Title", "stage", "age_days", "risk", "flag", "confidence", "finish_in", "why"] + \

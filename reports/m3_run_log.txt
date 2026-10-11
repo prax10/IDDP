@@ -1,0 +1,15 @@
+retuned config from M1: D d8 mcw50 -> {'learning_rate': 0.05, 'max_depth': 8, 'n_estimators': 109, 'min_child_weight': 50.0}, half-life 4.0
+v5b_live: val AUC 0.7851 (test scored only in stack stage)
+retuned: val AUC 0.7842 (test scored only in stack stage)
+retuned_ctext: val AUC 0.7828 (test scored only in stack stage)
+VAL AUCs: {'retuned': 0.7841578269637587, 'retuned_ctext': 0.7828318870892536}
+/home/claude/cap/task_m3_v6.py:94: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  ck = ck.assign(_o=ck.split.map({"train": 0, "val": 1, "test": 2})).sort_values(["_o", "Issue_ID", "checkpoint_index"])
+MLP val AUC 0.7710
+GRU val AUC 0.7845
+        model    auc  accuracy  balanced_acc  brier  auc_M1  auc_M3  auc_M5  auc_M8  auc_M10  auc_undetermined  auc_safe_undetermined  auc_M1_3  auc_M5_10  d_auc_vs_v5b      lo      hi           verdict
+retuned_ctext 0.8723    0.8101        0.7435 0.1304  0.8152  0.8413  0.8681  0.9004   0.9143            0.8432                 0.8300    0.8285     0.8951        0.0067  0.0064  0.0070 A better (CI > 0)
+      retuned 0.8719    0.8097        0.7433 0.1306  0.8141  0.8407  0.8677  0.9004   0.9145            0.8427                 0.8295    0.8277     0.8949        0.0063  0.0060  0.0066 A better (CI > 0)
+     v5b_live 0.8656    0.8017        0.7161 0.1368  0.8034  0.8326  0.8621  0.8966   0.9106            0.8350                 0.8227    0.8182     0.8907           NaN     NaN     NaN               NaN
+     mlp_live 0.8640    0.8018        0.7345 0.1347  0.8118  0.8345  0.8566  0.8897   0.9044            0.8330                 0.8211    0.8234     0.8837       -0.0016 -0.0023 -0.0010 B better (CI < 0)
+     gru_live 0.8628    0.7987        0.7172 0.1370  0.8103  0.8334  0.8562  0.8886   0.9023            0.8316                 0.8202    0.8220     0.8829       -0.0028 -0.0034 -0.0022 B better (CI < 0)

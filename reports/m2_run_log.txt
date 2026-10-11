@@ -1,0 +1,4 @@
+1,517,576 comments on 363,145 issues (15s)
+TF-IDF+SVD fitted on 400,000 pre-validation comments; explained variance 0.09 (79s)
+comment vectors + keyword flags done (219s)
+features (1342536, 64); rows with >=1 earlier comment 34.7% (225s)

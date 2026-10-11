@@ -2,7 +2,7 @@
 recommender.py -- "what would help?" for an open issue (flow mode).
 
 For one issue at moment T, each candidate action is applied to the issue's
-feature row and re-scored with the live v5b model:
+feature row and re-scored with the live model (v6, or v5b if v6 is absent):
 
   start_work      status -> in progress, work started, status just moved
   move_to_review  status -> review, review reached, status just moved

@@ -1,0 +1,45 @@
+fold sizes: [(675056, 135015), (810071, 135010), (945081, 135022)]
+    A v5b (lr.05 d8) fold 1: best 0.8535 @ 139 trees, at 43 trees 0.8483  (198s)
+    A v5b (lr.05 d8) fold 2: best 0.8638 @ 193 trees, at 43 trees 0.8559  (195s)
+    A v5b (lr.05 d8) fold 3: best 0.7840 @ 36 trees, at 43 trees 0.7827  (218s)
+  ==> A v5b (lr.05 d8): mean fold AUC 0.8318 @ 105 trees (v5b-style 43 trees: 0.8290)
+    B d6 fold 1: best 0.8536 @ 285 trees, at 43 trees 0.8457  (141s)
+    B d6 fold 2: best 0.8635 @ 321 trees, at 43 trees 0.8510  (162s)
+    B d6 fold 3: best 0.7859 @ 66 trees, at 43 trees 0.7852  (319s)
+  ==> B d6: mean fold AUC 0.8311 @ 134 trees (v5b-style 43 trees: 0.8273)
+    C d10 fold 1: best 0.8538 @ 158 trees, at 43 trees 0.8493  (192s)
+    C d10 fold 2: best 0.8625 @ 139 trees, at 43 trees 0.8571  (366s)
+    C d10 fold 3: best 0.7830 @ 34 trees, at 43 trees 0.7814  (251s)
+  ==> C d10: mean fold AUC 0.8314 @ 82 trees (v5b-style 43 trees: 0.8293)
+    D d8 mcw50 fold 1: best 0.8538 @ 183 trees, at 43 trees 0.8480  (161s)
+    D d8 mcw50 fold 2: best 0.8636 @ 205 trees, at 43 trees 0.8550  (175s)
+    D d8 mcw50 fold 3: best 0.7845 @ 59 trees, at 43 trees 0.7837  (192s)
+  ==> D d8 mcw50: mean fold AUC 0.8321 @ 109 trees (v5b-style 43 trees: 0.8289)
+Traceback (most recent call last):
+  File "/home/claude/cap/task_m1_retune.py", line 72, in <module>
+    mean, curves = run(cfg, tv, cols, F, MAX, name)
+                   ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/claude/cap/task_m1_retune.py", line 34, in run
+    m = xgb.XGBClassifier(n_estimators=max_trees, **cfg, **{**seeded(0), "eval_metric": "auc"})
+TypeError: xgboost.sklearn.XGBClassifier() got multiple values for keyword argument 'colsample_bytree'
+fold sizes: [(675056, 135015), (810071, 135010), (945081, 135022)]
+    E d8 colsample.5 fold 1: best 0.8540 @ 189 trees, at 43 trees 0.8462  (151s)
+    E d8 colsample.5 fold 2: best 0.8631 @ 199 trees, at 43 trees 0.8545  (175s)
+    E d8 colsample.5 fold 3: best 0.7794 @ 36 trees, at 43 trees 0.7782  (198s)
+  ==> E d8 colsample.5: mean fold AUC 0.8314 @ 143 trees (v5b-style 43 trees: 0.8263)
+    H v5b, half-life 2y fold 1: best 0.8533 @ 193 trees, at 43 trees 0.8470  (169s)
+    H v5b, half-life 2y fold 2: best 0.8640 @ 139 trees, at 43 trees 0.8562  (196s)
+    H v5b, half-life 2y fold 3: best 0.7834 @ 62 trees, at 43 trees 0.7822  (217s)
+  ==> H v5b, half-life 2y: mean fold AUC 0.8318 @ 92 trees (v5b-style 43 trees: 0.8285)
+    I d6 mcw50 col.6, hl 2y fold 1: best 0.8538 @ 243 trees, at 43 trees 0.8446  (145s)
+    I d6 mcw50 col.6, hl 2y fold 2: best 0.8648 @ 388 trees, at 43 trees 0.8515  (176s)
+    I d6 mcw50 col.6, hl 2y fold 3: best 0.7821 @ 69 trees, at 43 trees 0.7797  (196s)
+  ==> I d6 mcw50 col.6, hl 2y: mean fold AUC 0.8313 @ 144 trees (v5b-style 43 trees: 0.8252)
+                 config  learning_rate  max_depth  half_life  best_trees  mean_fold_auc  fold1_auc_at_best  fold2_auc_at_best  fold3_auc_at_best  mean_auc_at_43  mean_auc_at_100  mean_auc_at_200  min_child_weight  colsample_bytree
+             D d8 mcw50           0.05          8        4.0         109         0.8321             0.8534             0.8618             0.7810          0.8289           0.8316           0.8304              50.0               NaN
+    H v5b, half-life 2y           0.05          8        2.0          92         0.8318             0.8515             0.8623             0.7815          0.8285           0.8318           0.8299               NaN               NaN
+       A v5b (lr.05 d8)           0.05          8        4.0         105         0.8318             0.8530             0.8618             0.7804          0.8290           0.8317           0.8302               NaN               NaN
+                  C d10           0.05         10        4.0          82         0.8314             0.8529             0.8611             0.7803          0.8293           0.8313           0.8284               NaN               NaN
+       E d8 colsample.5           0.05          8        4.0         143         0.8314             0.8533             0.8628             0.7781          0.8263           0.8305           0.8306               NaN               0.5
+I d6 mcw50 col.6, hl 2y           0.05          6        2.0         144         0.8313             0.8530             0.8625             0.7784          0.8252           0.8309           0.8311              50.0               0.6
+                   B d6           0.05          6        4.0         134         0.8311             0.8523             0.8607             0.7803          0.8273           0.8310           0.8309               NaN               NaN
