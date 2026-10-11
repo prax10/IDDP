@@ -143,6 +143,8 @@ def flow_mode():
 
     with tab_card:
         card("md files/task-J-overnight-summary.md")
+        with st.expander("Further evidence (Task L): external companies, baselines, uncertainty, recommendations"):
+            card("md files/task-L-results.md")
 
 
 def what_would_help(iid, date, row):
