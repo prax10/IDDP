@@ -1,0 +1,94 @@
+  [static  1/39] P1: within=0.672 cross_time_respecting=0.684 pooled_time_respecting=0.688 cross_all_time=0.672
+  [static  2/39] P2: within=0.926 cross_time_respecting=0.514 pooled_time_respecting=0.721 cross_all_time=0.536
+  [static  3/39] P3: within=0.711 cross_time_respecting=0.660 pooled_time_respecting=0.689 cross_all_time=0.661
+  [static  4/39] P4: within=0.663 cross_time_respecting=0.677 pooled_time_respecting=0.677 cross_all_time=0.665
+  [static  5/39] P5: within=0.512 cross_time_respecting=0.578 pooled_time_respecting=0.564 cross_all_time=0.560
+  [static  6/39] P6: within=0.603 cross_time_respecting=0.458 pooled_time_respecting=0.534 cross_all_time=0.455
+  [static  7/39] P7: within=0.520 cross_time_respecting=0.584 pooled_time_respecting=0.567 cross_all_time=0.578
+  [static  8/39] P8: within=0.630 cross_time_respecting=0.602 pooled_time_respecting=0.579 cross_all_time=0.669
+  [static  9/39] P9: within=0.550 cross_time_respecting=0.656 pooled_time_respecting=0.658 cross_all_time=0.666
+  [static 10/39] P10: within=0.526 cross_time_respecting=0.607 pooled_time_respecting=0.595 cross_all_time=0.606
+  [static 11/39] P11: within=0.582 cross_time_respecting=0.577 pooled_time_respecting=0.596 cross_all_time=0.545
+  [static 12/39] P12: within=0.665 cross_time_respecting=0.671 pooled_time_respecting=0.675 cross_all_time=0.671
+  [static 13/39] P13: within=0.654 cross_time_respecting=0.701 pooled_time_respecting=0.707 cross_all_time=0.703
+  [static 14/39] P14: within=0.672 cross_time_respecting=0.651 pooled_time_respecting=0.672 cross_all_time=0.647
+  [static 15/39] P15: within=0.605 cross_time_respecting=0.705 pooled_time_respecting=0.729 cross_all_time=0.692
+  [static 16/39] P16: within=0.708 cross_time_respecting=0.733 pooled_time_respecting=0.737 cross_all_time=0.728
+  [static 17/39] P17: within=0.604 cross_time_respecting=0.679 pooled_time_respecting=0.680 cross_all_time=0.655
+  [static 18/39] P18: within=0.711 cross_time_respecting=0.714 pooled_time_respecting=0.726 cross_all_time=0.710
+  [static 19/39] P19: within=0.605 cross_time_respecting=0.633 pooled_time_respecting=0.633 cross_all_time=0.655
+  [static 20/39] P20: within=0.690 cross_time_respecting=0.697 pooled_time_respecting=0.701 cross_all_time=0.693
+  [static 21/39] P21: within=0.671 cross_time_respecting=0.642 pooled_time_respecting=0.661 cross_all_time=0.643
+  [static 22/39] P22: within=0.706 cross_time_respecting=0.727 pooled_time_respecting=0.731 cross_all_time=0.727
+  [static 23/39] P23: within=0.700 cross_time_respecting=0.710 pooled_time_respecting=0.735 cross_all_time=0.695
+  [static 24/39] P24: within=0.664 cross_time_respecting=0.650 pooled_time_respecting=0.657 cross_all_time=0.648
+  [static 26/39] P26: within=0.490 cross_time_respecting=0.561 pooled_time_respecting=0.561 cross_all_time=0.556
+  [static 27/39] P27: within=0.725 cross_time_respecting=0.583 pooled_time_respecting=0.622 cross_all_time=0.603
+  [static 28/39] P28: within=0.777 cross_time_respecting=0.756 pooled_time_respecting=0.782 cross_all_time=0.755
+  [static 29/39] P29: within=0.661 cross_time_respecting=0.639 pooled_time_respecting=0.650 cross_all_time=0.619
+  [static 30/39] P30: within=0.807 cross_time_respecting=0.765 pooled_time_respecting=0.814 cross_all_time=0.770
+  [static 31/39] P31: within=0.743 cross_time_respecting=0.682 pooled_time_respecting=0.712 cross_all_time=0.685
+  [static 32/39] P32: within=0.570 cross_time_respecting=0.621 pooled_time_respecting=0.637 cross_all_time=0.645
+  [static 33/39] P33: within=0.749 cross_time_respecting=0.706 pooled_time_respecting=0.735 cross_all_time=0.710
+  [static 34/39] P34: within=0.733 cross_time_respecting=0.716 pooled_time_respecting=0.727 cross_all_time=0.707
+  [static 35/39] P35: within=0.553 cross_time_respecting=0.595 pooled_time_respecting=0.576 cross_all_time=0.580
+  [static 36/39] P36: within=0.629 cross_time_respecting=0.564 pooled_time_respecting=0.562 cross_all_time=0.606
+  [static 37/39] P42: within=0.587 cross_time_respecting=0.589 pooled_time_respecting=0.592 cross_all_time=0.589
+  [static 38/39] P43: within=0.732 cross_time_respecting=0.690 pooled_time_respecting=0.715 cross_all_time=0.685
+  [static 39/39] P44: within=0.659 cross_time_respecting=0.620 pooled_time_respecting=0.687 cross_all_time=0.615
+=== STATIC model (one test set per project = its last 20%) ===
+  within                   mean=0.6570 median=0.6638 n=38
+  cross_time_respecting    mean=0.6472 median=0.6532 n=38
+  pooled_time_respecting   mean=0.6654 median=0.6759 n=38
+  cross_all_time           mean=0.6475 median=0.6580 n=38
+  cross_time_respecting beats within: 20/38 projects; mean diff -0.0097; Wilcoxon p=0.9771
+  pooled_time_respecting beats within: 25/38 projects; mean diff +0.0084; Wilcoxon p=0.0899
+  cross_all_time beats within: 19/38 projects; mean diff -0.0094; Wilcoxon p=1
+  cross_all_time beats cross_time_respecting: 15/38 projects; mean diff +0.0003; Wilcoxon p=0.3001
+  [dyn-v4  1/39] P1: within=0.788 cross_time_respecting=0.743 pooled_time_respecting=0.800 cross_all_time=0.794
+  [dyn-v4  2/39] P2: within=0.883 cross_time_respecting=0.902 pooled_time_respecting=0.916 cross_all_time=0.905
+  [dyn-v4  3/39] P3: within=0.885 cross_time_respecting=0.859 pooled_time_respecting=0.890 cross_all_time=0.867
+  [dyn-v4  4/39] P4: within=0.734 cross_time_respecting=0.759 pooled_time_respecting=0.763 cross_all_time=0.734
+  [dyn-v4  5/39] P5: within=0.656 cross_time_respecting=0.712 pooled_time_respecting=0.740 cross_all_time=0.744
+  [dyn-v4  6/39] P6: within=0.513 cross_time_respecting=0.671 pooled_time_respecting=0.737 cross_all_time=0.641
+  [dyn-v4  7/39] P7: within=0.708 cross_time_respecting=0.771 pooled_time_respecting=0.798 cross_all_time=0.758
+  [dyn-v4  8/39] P8: within=0.540 cross_time_respecting=0.694 pooled_time_respecting=0.688 cross_all_time=0.728
+  [dyn-v4  9/39] P9: within=0.547 cross_time_respecting=0.753 pooled_time_respecting=0.756 cross_all_time=0.750
+  [dyn-v4 10/39] P10: within=0.682 cross_time_respecting=0.773 pooled_time_respecting=0.808 cross_all_time=0.806
+  [dyn-v4 11/39] P11: within=0.798 cross_time_respecting=0.770 pooled_time_respecting=0.806 cross_all_time=0.750
+  [dyn-v4 12/39] P12: within=0.798 cross_time_respecting=0.791 pooled_time_respecting=0.805 cross_all_time=0.766
+  [dyn-v4 13/39] P13: within=0.777 cross_time_respecting=0.793 pooled_time_respecting=0.806 cross_all_time=0.797
+  [dyn-v4 14/39] P14: within=0.777 cross_time_respecting=0.747 pooled_time_respecting=0.769 cross_all_time=0.753
+  [dyn-v4 15/39] P15: within=0.756 cross_time_respecting=0.837 pooled_time_respecting=0.850 cross_all_time=0.833
+  [dyn-v4 16/39] P16: within=0.753 cross_time_respecting=0.805 pooled_time_respecting=0.783 cross_all_time=0.805
+  [dyn-v4 17/39] P17: within=0.836 cross_time_respecting=0.785 pooled_time_respecting=0.835 cross_all_time=0.815
+  [dyn-v4 18/39] P18: within=0.803 cross_time_respecting=0.789 pooled_time_respecting=0.823 cross_all_time=0.796
+  [dyn-v4 19/39] P19: within=0.681 cross_time_respecting=0.758 pooled_time_respecting=0.738 cross_all_time=0.748
+  [dyn-v4 20/39] P20: within=0.729 cross_time_respecting=0.750 pooled_time_respecting=0.755 cross_all_time=0.772
+  [dyn-v4 21/39] P21: within=0.788 cross_time_respecting=0.771 pooled_time_respecting=0.794 cross_all_time=0.756
+  [dyn-v4 22/39] P22: within=0.834 cross_time_respecting=0.828 pooled_time_respecting=0.836 cross_all_time=0.783
+  [dyn-v4 23/39] P23: within=0.701 cross_time_respecting=0.737 pooled_time_respecting=0.722 cross_all_time=0.705
+  [dyn-v4 24/39] P24: within=0.757 cross_time_respecting=0.758 pooled_time_respecting=0.770 cross_all_time=0.751
+  [dyn-v4 26/39] P26: within=0.655 cross_time_respecting=0.774 pooled_time_respecting=0.781 cross_all_time=0.727
+  [dyn-v4 27/39] P27: within=0.745 cross_time_respecting=0.738 pooled_time_respecting=0.778 cross_all_time=0.689
+  [dyn-v4 28/39] P28: within=0.833 cross_time_respecting=0.795 pooled_time_respecting=0.827 cross_all_time=0.770
+  [dyn-v4 29/39] P29: within=0.686 cross_time_respecting=0.845 pooled_time_respecting=0.852 cross_all_time=0.800
+  [dyn-v4 30/39] P30: within=0.721 cross_time_respecting=0.736 pooled_time_respecting=0.767 cross_all_time=0.735
+  [dyn-v4 31/39] P31: within=0.874 cross_time_respecting=0.883 pooled_time_respecting=0.894 cross_all_time=0.835
+  [dyn-v4 32/39] P32: within=0.760 cross_time_respecting=0.757 pooled_time_respecting=0.789 cross_all_time=0.762
+  [dyn-v4 33/39] P33: within=0.899 cross_time_respecting=0.858 pooled_time_respecting=0.899 cross_all_time=0.861
+  [dyn-v4 34/39] P34: within=0.907 cross_time_respecting=0.857 pooled_time_respecting=0.906 cross_all_time=0.852
+  [dyn-v4 35/39] P35: within=0.719 cross_time_respecting=0.698 pooled_time_respecting=0.736 cross_all_time=0.669
+  [dyn-v4 36/39] P36: within=0.746 cross_time_respecting=0.739 pooled_time_respecting=0.746 cross_all_time=0.700
+  [dyn-v4 37/39] P42: within=0.838 cross_time_respecting=0.796 pooled_time_respecting=0.836 cross_all_time=0.791
+  [dyn-v4 38/39] P43: within=0.855 cross_time_respecting=0.814 pooled_time_respecting=0.836 cross_all_time=0.820
+  [dyn-v4 39/39] P44: within=0.749 cross_time_respecting=0.708 pooled_time_respecting=0.747 cross_all_time=0.715
+=== DYNAMIC v4 model (checkpoint rows of the same test issues) ===
+  within                   mean=0.7556 median=0.7563 n=38
+  cross_time_respecting    mean=0.7779 median=0.7707 n=38
+  pooled_time_respecting   mean=0.7995 median=0.7961 n=38
+  cross_all_time           mean=0.7706 median=0.7638 n=38
+  cross_time_respecting beats within: 19/38 projects; mean diff +0.0223; Wilcoxon p=0.2551
+  pooled_time_respecting beats within: 29/38 projects; mean diff +0.0439; Wilcoxon p=7.247e-07
+  cross_all_time beats within: 19/38 projects; mean diff +0.0150; Wilcoxon p=0.5466
+  cross_all_time beats cross_time_respecting: 15/38 projects; mean diff -0.0073; Wilcoxon p=0.1252

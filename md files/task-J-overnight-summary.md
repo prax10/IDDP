@@ -27,11 +27,21 @@ The pooled dynamic model on the same 262,433 test checkpoint rows:
 | All (262k) | 0.798 | 0.858 | **0.866** | +0.069 |
 | Outcome still open (228k) | 0.752 | 0.826 | **0.836** | +0.084 |
 | Censoring-safe (159k) | 0.789 | 0.850 | **0.858** | +0.069 |
-| **Censoring-safe and outcome still open (136k)** | **0.738** | 0.814 | **0.823** | **+0.085** |
+| **Censoring-safe and outcome still open (136k)** | **0.738** | 0.814 | **0.823** | **+0.086** |
 
 **Static vs dynamic.** Dynamic now beats static from the very first checkpoint. At M1 static is 0.728 vs v5b 0.803, and the gap grows to +0.17 by M10 [`h1_metrics_panel.csv`, `i4_dynamic_v4_vs_static.csv`]. The old "crossover at M3" no longer holds. It was a property of the weaker feature set.
 
 **Strictly causal deployment number: 0.857.** This comes from retraining every month on only the outcomes known at that point, J9 below. Quote it next to 0.866.
+
+**Claims in the paper that changed tonight** (the exact edits are in `paper-updates-v5.md`):
+
+| Topic | Before | Now |
+|---|---|---|
+| Crossover | M3 | **M1**. Dynamic wins everywhere, even against a static model given every creation-time feature (J10). |
+| Cross-project | "beats within-project on 30/38" | **Not supported** once both arms use the same test set. Cross ≈ within; pooling all projects' history is best (29/38, dynamic) (J3). |
+| Patterns | "real but marginal" | Still marginal. Kula's stall and pattern features add exactly nothing once activity is observed (J6), and the Bayesian LOO effect does not transfer to test (J7). |
+| Text | top static group | Still true for static. For dynamic it is the 3rd-smallest group (J2). |
+| New threats | — | Right-censoring at the dataset end (J1), and creation-date-split look-ahead (J9). Both are quantified, and the headline numbers hold on safe rows. |
 
 ## 2. What each stage found
 
@@ -142,8 +152,30 @@ Fitted with PyMC NUTS on a 30k-row stratified sample (2 chains × 800 draws). Sc
 | Number of status transitions | −0.25 |
 | Comments in the last 7 days | −0.16 |
 
-### J3 — Time-respecting cross-project test
-_(filled in below once the run finishes)_
+### J3 — Time-respecting cross-project test (future-work #4) [`j3_lopo_static.csv`, `j3_lopo_dynamic_v4.csv`, `j3_summary.txt`]
+
+Phase 9 had **two** asymmetries:
+1. cross-project trained on all time periods;
+2. cross-project was **scored on all of the held-out project's issues while within-project was scored on its last 20% only**, which are different test sets.
+
+Now every arm is scored on the same test set: each project's chronologically last 20%. The time-respecting arms only train on issues created before that project's test cutoff. 38 projects.
+
+| Training data | Static mean AUC | Dynamic (v4) mean AUC |
+|---|---|---|
+| Within: own project's first 80% | 0.657 | 0.756 |
+| Cross: other projects, before the cutoff | 0.647 | 0.778 |
+| **Pooled: all projects incl. own, before the cutoff** | **0.665** | **0.800** |
+| Cross, all time (the original Phase 9 setup) | 0.648 | 0.771 |
+
+| Comparison (paired, 38 projects) | Static | Dynamic |
+|---|---|---|
+| Cross (time-respecting) vs within | 20/38, −0.010, p = 0.98 | 19/38, +0.022, p = 0.26 |
+| **Pooled vs within** | 25/38, +0.008, p = 0.09 | **29/38, +0.044, p = 7×10⁻⁷** |
+| Cross all-time vs cross time-respecting | +0.0003, p = 0.30 | −0.007, p = 0.13 |
+
+- **What changes:** the headline "cross-project beats within-project on 30/38 (0.710 vs 0.657)" **does not survive a common test set**. It came mainly from asymmetry (2). Time leakage (1) turns out to be negligible (+0.0003 static).
+- **The corrected RQ3 answer:** a model trained only on other projects is about as good as one trained on the project's own history, with no significant difference. That is still a positive transfer result: no collapse on unseen projects.
+- **The practical result:** the best option is pooling every project's past data, including the project's own. For the dynamic model this significantly beats own-history-only training on 29 of 38 projects.
 
 ## 3. Files
 - **Scripts:**

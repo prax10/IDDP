@@ -1,0 +1,19 @@
+=== STATIC model (one test set per project = its last 20%) ===
+  within                   mean=0.6570 median=0.6638 n=38
+  cross_time_respecting    mean=0.6472 median=0.6532 n=38
+  pooled_time_respecting   mean=0.6654 median=0.6759 n=38
+  cross_all_time           mean=0.6475 median=0.6580 n=38
+  cross_time_respecting beats within: 20/38 projects; mean diff -0.0097; Wilcoxon p=0.9771
+  pooled_time_respecting beats within: 25/38 projects; mean diff +0.0084; Wilcoxon p=0.0899
+  cross_all_time beats within: 19/38 projects; mean diff -0.0094; Wilcoxon p=1
+  cross_all_time beats cross_time_respecting: 15/38 projects; mean diff +0.0003; Wilcoxon p=0.3001
+
+=== DYNAMIC v4 model (checkpoint rows of the same test issues) ===
+  within                   mean=0.7556 median=0.7563 n=38
+  cross_time_respecting    mean=0.7779 median=0.7707 n=38
+  pooled_time_respecting   mean=0.7995 median=0.7961 n=38
+  cross_all_time           mean=0.7706 median=0.7638 n=38
+  cross_time_respecting beats within: 19/38 projects; mean diff +0.0223; Wilcoxon p=0.2551
+  pooled_time_respecting beats within: 29/38 projects; mean diff +0.0439; Wilcoxon p=7.247e-07
+  cross_all_time beats within: 19/38 projects; mean diff +0.0150; Wilcoxon p=0.5466
+  cross_all_time beats cross_time_respecting: 15/38 projects; mean diff -0.0073; Wilcoxon p=0.1252

@@ -19,6 +19,8 @@ This doc lists what to change in `paper-package.md` and `results-summary.md`, se
 | Text is the #1 static group | Still true for static. For dynamic, text falls to 0.034 summed \|SHAP\|, the 3rd smallest group | `j2_shap_groups_v5b.csv` |
 | "Late advantage comes primarily from survival" | Early on, workflow status history leads. Late, elapsed time / position vs the label threshold dominates (0.42 → 0.99 summed \|SHAP\|) | `j2_shap_group_shift_v5b.csv` |
 | Per-checkpoint ≈ pooled | Pooled ≥ per-checkpoint at all 10 checkpoints (equal at M1, +0.004 to +0.015 at M2–M10) | `h1_percheckpoint_all10_tuned.csv` |
+| "Cross-project beats within on 30/38" | Cross ≈ within on a common test set; pooled multi-project training is best (dynamic: 29/38, p = 7×10⁻⁷) | `j3_summary.txt` |
+| "Dynamic wins because of progress" (untested) | Confirmed against a static model given every creation-time feature: still +0.064 at M1 | `j10_static_plus_vs_v5b.csv` |
 
 **Add RQ5 (Scrum):** can the same framework predict whether a committed issue will finish within its sprint?
 
@@ -92,7 +94,19 @@ Old dynamic values are the 5-seed re-estimates from `h1_metrics_panel.csv` (pool
 
 Team-history baseline: AUC 0.590. Difference +0.156 [+0.148, +0.165].
 
-**6.5 Generalisation: replace with the J3 results** (see `task-J-overnight-summary.md` §J3 and `j3_summary.txt`).
+**6.5 Generalisation: REPLACE (the old headline does not survive).** Every arm is now scored on the same test set: each project's last 20%. The time-respecting arms train only on issues created before that project's test cutoff (`j3_summary.txt`).
+
+| Training data | Static | Dynamic v4 |
+|---|---|---|
+| Within (own first 80%) | 0.657 | 0.756 |
+| Cross, other projects, time-respecting | 0.647 | 0.778 |
+| **Pooled, all projects, time-respecting** | **0.665** | **0.800** |
+| Cross, all time (old setup, same test set) | 0.648 | 0.771 |
+
+- Cross vs within: not significantly different. Static 20/38 projects, p = 0.98; dynamic 19/38, p = 0.26.
+- **Pooled vs within (dynamic): 29/38 projects, +0.044, Wilcoxon p = 7×10⁻⁷.**
+- **New RQ3 sentence:** "Training on other projects alone matches training on a project's own history, and pooling all projects' past data is significantly better for the dynamic model (29/38 projects)."
+- Delete the claims "cross beats within on 30/38" and "0.710 vs 0.657". They came from scoring the two arms on different test sets.
 
 **6.7 SHAP: replace with `j2_shap_v5b.png`** and the group table in the overnight summary.
 
@@ -105,6 +119,7 @@ Team-history baseline: AUC 0.590. Difference +0.156 [+0.148, +0.165].
   - Most of Task H's "+0.13 from adding val data" lives in the exposed rows (M10: +0.24 vs +0.03).
   - All headline comparisons hold on censoring-safe rows (`j1_contrasts.csv`). Report both.
 - **Creation-date split look-ahead (new).** The frozen model trains on validation issues that resolve during the test period. The strictly causal rolling protocol scores 0.009 lower overall (0.857 vs 0.866), and the gap sits entirely in censored rows.
+- **Phase 9 asymmetries (rewrite):** both are now fixed in J3. The test-set mismatch, not time leakage, drove the old cross-project advantage.
 - **Remove:** "tuned vs untuned confounds hyperparameters with training data" (resolved in H3: the effect is data, not tuning). Also remove "per-checkpoint tuned for only 3 of 10" (H1 covers all 10).
 - **Keep and reword:** test-period separability (now explained largely by censoring), and the clustering subsample (still not run at full scale).
 - **Final-value fields.** `Story_Point`, title and description length are final values in TAWOS. The time-correct `sp_at_T` is now included. Text-length features contribute about 0.003 AUC.
@@ -118,3 +133,4 @@ Team-history baseline: AUC 0.590. Difference +0.156 [+0.148, +0.165].
 9. **Censoring diagnosed.** The apparent value of the most recent training data was mostly an artifact of resolved-only sampling near the snapshot end (J1).
 10. **Two Scrum-label leaks caught before reporting.** Carry-over events after early sprint completion, and pre-sprint planning moves counted as commitments. Logs: `j5_run_log_v1_*`, `j5_run_log_v2_*`.
 11. **The Phase 8 status-fallback leak fixed** in the new activity features.
+12. **A headline claim corrected.** "Cross-project beats within-project on 30/38" came from scoring the two arms on different test sets. With a common test set, cross ≈ within, and pooled is best (J3).
