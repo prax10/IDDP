@@ -1,0 +1,4 @@
+variant,learning_rate,max_depth,n_estimators,val_auc,n_features
+v4,0.1,6,19,0.7640420668245753,61
+v5a,0.05,8,37,0.7687754287462947,92
+v5b,0.05,8,43,0.7861242659504097,94

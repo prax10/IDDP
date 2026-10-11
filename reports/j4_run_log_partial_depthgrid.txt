@@ -1,0 +1,13 @@
+
+=== v4 (61 features) ===
+    v4 {'learning_rate': 0.1, 'max_depth': 6}: val 0.7640 trees 19
+    v4 {'learning_rate': 0.1, 'max_depth': 8}: val 0.7638 trees 16
+    v4 {'learning_rate': 0.1, 'max_depth': 10}: val 0.7614 trees 15
+    v4 {'learning_rate': 0.1, 'max_depth': 12}: val 0.7606 trees 15
+    v4 {'learning_rate': 0.05, 'max_depth': 8}: val 0.7639 trees 33
+  [v4] selected {'learning_rate': 0.1, 'max_depth': 6, 'n_estimators': 19} val_AUC=0.7640
+
+=== v5a (92 features) ===
+    v5a {'learning_rate': 0.1, 'max_depth': 6}: val 0.7684 trees 21
+    v5a {'learning_rate': 0.1, 'max_depth': 8}: val 0.7685 trees 17
+    v5a {'learning_rate': 0.1, 'max_depth': 10}: val 0.7676 trees 15

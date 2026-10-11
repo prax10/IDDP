@@ -1,0 +1,54 @@
+Top 20 features (mean |SHAP|, v5b):
+log_elapsed_over_median        0.6240
+status_bucket                  0.3782
+assignee_prior_delay_rate      0.1247
+log_min_since_last_activity    0.1212
+log_min_since_last_change      0.1154
+Project_ID                     0.1009
+n_links                        0.0958
+ever_in_review                 0.0628
+reporter_rate_known            0.0526
+Type_Normalized                0.0493
+log_min_since_last_comment     0.0364
+n_transitions                  0.0316
+past_median                    0.0239
+assignee_rate_known            0.0230
+n_assignee_changes             0.0214
+ever_in_progress               0.0206
+log_desc_len                   0.0194
+assigned_at_T                  0.0193
+n_link_chg                     0.0179
+assignee_n_known               0.0164
+
+By group:
+elapsed time / threshold     0.6585
+workflow status history      0.6089
+people track record          0.2290
+recency of activity          0.1683
+links / field churn          0.1485
+project context              0.1292
+issue attributes             0.0822
+assignment / reassignment    0.0553
+text (30 SBERT PCs)          0.0336
+sprint / scrum               0.0296
+estimates / story points     0.0206
+stall + pattern (Kula)       0.0177
+workload                     0.0054
+comments                     0.0011
+
+Group shift early -> late:
+                           early_M1_M3  late_M8_M10  late_minus_early
+people track record             0.2755       0.1893           -0.0862
+workflow status history         0.6358       0.5622           -0.0736
+issue attributes                0.1086       0.0646           -0.0440
+links / field churn             0.1621       0.1342           -0.0279
+estimates / story points        0.0251       0.0171           -0.0080
+assignment / reassignment       0.0562       0.0528           -0.0034
+workload                        0.0062       0.0048           -0.0014
+comments                        0.0014       0.0009           -0.0005
+project context                 0.1273       0.1271           -0.0003
+text (30 SBERT PCs)             0.0325       0.0335            0.0010
+sprint / scrum                  0.0282       0.0303            0.0021
+stall + pattern (Kula)          0.0137       0.0196            0.0059
+recency of activity             0.1359       0.1927            0.0568
+elapsed time / threshold        0.4157       0.9857            0.5700

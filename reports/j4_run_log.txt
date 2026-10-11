@@ -1,0 +1,114 @@
+
+=== v4 (61 features) ===
+    v4 {'learning_rate': 0.1, 'max_depth': 6}: val 0.7640 trees 19
+    v4 {'learning_rate': 0.1, 'max_depth': 8}: val 0.7638 trees 16
+    v4 {'learning_rate': 0.05, 'max_depth': 8}: val 0.7639 trees 33
+  [v4] selected {'learning_rate': 0.1, 'max_depth': 6, 'n_estimators': 19} val_AUC=0.7640
+
+=== v5a (92 features) ===
+    v5a {'learning_rate': 0.1, 'max_depth': 6}: val 0.7684 trees 21
+    v5a {'learning_rate': 0.1, 'max_depth': 8}: val 0.7685 trees 17
+    v5a {'learning_rate': 0.05, 'max_depth': 8}: val 0.7688 trees 37
+  [v5a] selected {'learning_rate': 0.05, 'max_depth': 8, 'n_estimators': 37} val_AUC=0.7688
+
+=== v5b (94 features) ===
+    v5b {'learning_rate': 0.1, 'max_depth': 6}: val 0.7860 trees 29
+    v5b {'learning_rate': 0.1, 'max_depth': 8}: val 0.7836 trees 22
+    v5b {'learning_rate': 0.05, 'max_depth': 8}: val 0.7861 trees 43
+  [v5b] selected {'learning_rate': 0.05, 'max_depth': 8, 'n_estimators': 43} val_AUC=0.7861
+
+Test AUC (5-seed mean):
+variant                      v4     v5a     v5b
+subset            scope                        
+all               M1     0.7875  0.7998  0.8031
+                  M10    0.8886  0.8978  0.9109
+                  M5     0.8459  0.8557  0.8624
+                  all    0.8510  0.8604  0.8656
+safe              M1     0.7940  0.8043  0.8042
+                  M10    0.8655  0.8752  0.8837
+                  M5     0.8382  0.8479  0.8526
+                  all    0.8450  0.8540  0.8571
+safe_undetermined M1     0.7934  0.8038  0.8036
+                  M10    0.7774  0.7899  0.7992
+                  M5     0.8185  0.8293  0.8341
+                  all    0.8085  0.8192  0.8225
+undetermined      M1     0.7869  0.7993  0.8026
+                  M10    0.8201  0.8315  0.8466
+                  M5     0.8309  0.8416  0.8485
+                  all    0.8182  0.8294  0.8350
+
+Accuracy@0.5:
+variant                      v4     v5a     v5b
+subset            scope                        
+all               M1     0.7034  0.7193  0.7269
+                  M10    0.8745  0.8801  0.8853
+                  M5     0.7944  0.8037  0.8061
+                  all    0.7883  0.7978  0.8018
+safe              M1     0.7192  0.7315  0.7341
+                  M10    0.8843  0.8875  0.8880
+                  M5     0.8009  0.8084  0.8085
+                  all    0.7973  0.8052  0.8066
+safe_undetermined M1     0.7187  0.7310  0.7336
+                  M10    0.8174  0.8225  0.8232
+                  M5     0.7828  0.7910  0.7911
+                  all    0.7636  0.7728  0.7744
+undetermined      M1     0.7030  0.7188  0.7265
+                  M10    0.8066  0.8152  0.8233
+                  M5     0.7800  0.7899  0.7926
+                  all    0.7567  0.7676  0.7723
+
+Gain vs v4 (95% CI):
+  v5a  all                all +0.0095 [+0.0091, +0.0098]
+  v5a  all                M1  +0.0123 [+0.0111, +0.0135]
+  v5a  all                M5  +0.0098 [+0.0087, +0.0111]
+  v5a  all                M10 +0.0092 [+0.0078, +0.0106]
+  v5a  safe               all +0.0090 [+0.0085, +0.0094]
+  v5a  safe               M1  +0.0103 [+0.0090, +0.0117]
+  v5a  safe               M5  +0.0096 [+0.0081, +0.0111]
+  v5a  safe               M10 +0.0097 [+0.0079, +0.0116]
+  v5a  undetermined       all +0.0111 [+0.0107, +0.0115]
+  v5a  undetermined       M1  +0.0123 [+0.0112, +0.0135]
+  v5a  undetermined       M5  +0.0107 [+0.0094, +0.0120]
+  v5a  undetermined       M10 +0.0114 [+0.0093, +0.0136]
+  v5a  safe_undetermined  all +0.0108 [+0.0102, +0.0113]
+  v5a  safe_undetermined  M1  +0.0103 [+0.0090, +0.0118]
+  v5a  safe_undetermined  M5  +0.0108 [+0.0090, +0.0125]
+  v5a  safe_undetermined  M10 +0.0125 [+0.0094, +0.0157]
+  v5b  all                all +0.0147 [+0.0142, +0.0152]
+  v5b  all                M1  +0.0156 [+0.0142, +0.0171]
+  v5b  all                M5  +0.0166 [+0.0149, +0.0182]
+  v5b  all                M10 +0.0223 [+0.0201, +0.0243]
+  v5b  safe               all +0.0120 [+0.0115, +0.0126]
+  v5b  safe               M1  +0.0101 [+0.0086, +0.0115]
+  v5b  safe               M5  +0.0144 [+0.0123, +0.0164]
+  v5b  safe               M10 +0.0182 [+0.0155, +0.0210]
+  v5b  undetermined       all +0.0168 [+0.0163, +0.0174]
+  v5b  undetermined       M1  +0.0157 [+0.0143, +0.0170]
+  v5b  undetermined       M5  +0.0176 [+0.0159, +0.0194]
+  v5b  undetermined       M10 +0.0265 [+0.0235, +0.0295]
+  v5b  safe_undetermined  all +0.0140 [+0.0134, +0.0147]
+  v5b  safe_undetermined  M1  +0.0101 [+0.0087, +0.0117]
+  v5b  safe_undetermined  M5  +0.0155 [+0.0132, +0.0179]
+  v5b  safe_undetermined  M10 +0.0218 [+0.0175, +0.0266]
+
+Top features (v5b):
+log_min_since_last_change      0.2632
+past_median                    0.1055
+log_elapsed_over_median        0.0835
+log_min_since_last_activity    0.0817
+status_bucket                  0.0671
+ever_in_review                 0.0654
+assignee_prior_delay_rate      0.0200
+ever_in_progress               0.0128
+log_min_since_last_comment     0.0122
+n_transitions                  0.0107
+Type_Normalized                0.0106
+n_links                        0.0106
+n_assignee_changes             0.0090
+project_open_at_T              0.0087
+in_sprint_at_T                 0.0084
+assignee_rate_known            0.0082
+reporter_rate_known            0.0078
+Project_ID                     0.0077
+assigned_at_T                  0.0077
+n_link_chg                     0.0070

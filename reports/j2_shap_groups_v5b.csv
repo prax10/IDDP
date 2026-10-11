@@ -1,0 +1,15 @@
+,summed_mean_abs_shap
+elapsed time / threshold,0.65849453
+workflow status history,0.6088609
+people track record,0.22904341
+recency of activity,0.1682849
+links / field churn,0.1484777
+project context,0.12924051
+issue attributes,0.08223849
+assignment / reassignment,0.055324156
+text (30 SBERT PCs),0.033617344
+sprint / scrum,0.029609712
+estimates / story points,0.020559167
+stall + pattern (Kula),0.017651722
+workload,0.0054086624
+comments,0.0011101326

@@ -1,0 +1,170 @@
+
+=== B1_no_pattern: (30000, 28) ===
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [mu_a, sigma_a, z_proj, beta]
+/usr/local/lib/python3.13/dist-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
+  return _sample_return(
+Sampling 2 chains for 800 tune and 800 draw iterations (1_600 + 1_600 draws total) took 870 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+{
+  "test_auc": 0.831960938396641,
+  "test_brier": 0.14750120043754578,
+  "test_ece": 0.01429881634968002,
+  "mean_90pct_interval_width": 0.06427660584449768,
+  "max_rhat": 1.0128687422968148,
+  "min_ess_bulk": 166.91310526340322
+}
+                                      mean      sd eti94_lb eti94_ub ess_bulk ess_tail r_hat mcse_mean  mcse_sd
+beta[log_min_since_last_change]       0.06   0.059   -0.053     0.17      677      788  1.00    0.0023   0.0014
+beta[log_min_since_last_activity]    0.012   0.074    -0.12     0.15      611      890  1.00     0.003   0.0017
+beta[log_min_since_last_comment]     0.135    0.06    0.023     0.24      668     1090  1.00    0.0023   0.0012
+beta[ever_in_review]                 0.002   0.037   -0.067    0.074      998     1098  1.00    0.0012  0.00087
+beta[ever_in_progress]              -0.127   0.027    -0.18   -0.075     1215     1037  1.00   0.00078  0.00064
+beta[log_n_transitions]             -0.248   0.034    -0.31    -0.18      820      889  1.00    0.0012  0.00089
+beta[log_comments_7d]               -0.156  0.0187    -0.19    -0.12     1545     1223  1.00   0.00048  0.00043
+beta[assignee_prior_delay_rate]     0.4824   0.017     0.45     0.52     3104     1292  1.00   0.00031  0.00053
+beta[log_story_point]                0.156   0.022     0.12      0.2     1809     1286  1.00   0.00052  0.00059
+beta[log_elapsed]                    0.513   0.046     0.43      0.6      717      931  1.00    0.0017  0.00094
+beta[log1p_stall]                   0.0548  0.0187    0.021    0.091     2220     1291  1.00    0.0004  0.00046
+beta[checkpoint_index]              0.1119  0.0191    0.076     0.15     2124     1165  1.00   0.00041  0.00044
+beta[is_unassigned]                 0.1471   0.018     0.11     0.18     1994     1264  1.00    0.0004  0.00046
+beta[log_n_links]                   0.3341  0.0188      0.3     0.37     1863     1331  1.00   0.00043  0.00044
+beta[priority_num]                 -0.1808   0.017    -0.21    -0.15     1957     1289  1.00   0.00039  0.00041
+beta[priority_unknown]               0.182   0.035     0.12     0.25      639      856  1.00    0.0014   0.0008
+beta[type_Bug]                      -0.001   0.042    -0.08    0.078      504      710  1.01    0.0019   0.0011
+beta[type_Improvement]               0.189    0.03     0.13     0.25      600      764  1.00    0.0012  0.00077
+beta[type_Task]                       0.06   0.026    0.013     0.11      639      930  1.00     0.001  0.00059
+beta[type_New Feature]                0.15   0.026      0.1      0.2      908      927  1.00   0.00087  0.00063
+beta[type_Story]                     0.074    0.03    0.019     0.13      634      879  1.00    0.0012   0.0007
+beta[type_Sub-task]                 -0.106   0.024    -0.15   -0.059      616      910  1.00   0.00097  0.00052
+beta[status_review]                 -0.333    0.03    -0.39    -0.28      900     1111  1.00   0.00099  0.00066
+beta[status_in_progress]            -0.129   0.021    -0.17   -0.091     1181     1113  1.00   0.00062  0.00058
+beta[status_testing]                -0.145  0.0194    -0.18    -0.11     1049     1231  1.00    0.0006  0.00044
+beta[status_waiting]               -0.0569  0.0144   -0.084    -0.03     1339     1122  1.00   0.00039  0.00031
+beta[status_done]                    0.116  0.0176    0.084     0.15     1395     1304  1.00   0.00047  0.00043
+beta[status_reopened]               0.0041  0.0146   -0.023    0.031     2001     1124  1.00   0.00032  0.00037
+mu_a                                  1.21    0.11        1      1.4      166      232  1.01    0.0088   0.0062
+sigma_a                               0.71   0.092     0.57      0.9      294      326  1.01    0.0052    0.003
+
+=== B1_with_pattern: (30000, 32) ===
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [mu_a, sigma_a, z_proj, beta]
+/usr/local/lib/python3.13/dist-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
+  return _sample_return(
+Sampling 2 chains for 800 tune and 800 draw iterations (1_600 + 1_600 draws total) took 894 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+{
+  "test_auc": 0.8321721345895556,
+  "test_brier": 0.14728480577468872,
+  "test_ece": 0.014611710997811528,
+  "mean_90pct_interval_width": 0.07056973874568939,
+  "max_rhat": 1.01631335695634,
+  "min_ess_bulk": 100.98405415157065
+}
+                                      mean      sd eti94_lb eti94_ub ess_bulk ess_tail r_hat mcse_mean  mcse_sd
+beta[log_min_since_last_change]      0.062   0.057   -0.046     0.17      951     1109  1.00    0.0019   0.0013
+beta[log_min_since_last_activity]    0.005   0.073    -0.13     0.14      923     1119  1.00    0.0024   0.0016
+beta[log_min_since_last_comment]     0.145    0.06    0.037     0.26      788      921  1.00    0.0022   0.0013
+beta[ever_in_review]                    -0   0.038   -0.072     0.07      867      937  1.00    0.0013  0.00092
+beta[ever_in_progress]              -0.123   0.028    -0.18   -0.071     1022     1113  1.00   0.00087  0.00058
+beta[log_n_transitions]             -0.254   0.034    -0.32    -0.19      895     1041  1.00    0.0011  0.00078
+beta[log_comments_7d]               -0.149  0.0193    -0.19    -0.11     2183     1140  1.00   0.00041  0.00047
+beta[assignee_prior_delay_rate]     0.4771  0.0176     0.44     0.51     1894     1285  1.00    0.0004  0.00042
+beta[log_story_point]                0.157  0.0216     0.12      0.2     1607     1193  1.00   0.00054  0.00047
+beta[log_elapsed]                    0.529   0.048     0.44     0.62      770      894  1.00    0.0017   0.0011
+beta[log1p_stall]                   -0.008   0.027   -0.059    0.042     1367     1096  1.00   0.00073  0.00058
+beta[checkpoint_index]               0.164   0.023     0.12     0.21     1467     1141  1.00   0.00061  0.00052
+beta[is_unassigned]                  0.143   0.018     0.11     0.18     2088     1205  1.00   0.00039  0.00044
+beta[log_n_links]                   0.3328  0.0186      0.3     0.37     2419     1402  1.00   0.00038  0.00047
+beta[priority_num]                 -0.1773  0.0164    -0.21    -0.15     2022     1327  1.00   0.00036  0.00037
+beta[priority_unknown]               0.178   0.036     0.11     0.25      567      926  1.00    0.0015  0.00091
+beta[type_Bug]                       0.002   0.042   -0.076    0.083      445      618  1.00     0.002   0.0013
+beta[type_Improvement]               0.187   0.031     0.13     0.24      498      781  1.00    0.0014  0.00073
+beta[type_Task]                      0.061   0.026    0.014     0.11      565      847  1.00    0.0011  0.00057
+beta[type_New Feature]               0.151   0.027      0.1      0.2      904     1213  1.00   0.00089   0.0006
+beta[type_Story]                     0.078   0.031    0.019     0.14      599      713  1.00    0.0013  0.00074
+beta[type_Sub-task]                 -0.106   0.024    -0.15    -0.06      507      735  1.00    0.0011  0.00062
+beta[status_review]                 -0.339    0.03     -0.4    -0.28      930     1081  1.00     0.001  0.00065
+beta[status_in_progress]            -0.146  0.0215    -0.19    -0.11     1320     1251  1.00   0.00059  0.00041
+beta[status_testing]                -0.147  0.0197    -0.19    -0.11     1059      968  1.00   0.00061  0.00043
+beta[status_waiting]               -0.0592  0.0149   -0.087   -0.031     1317      901  1.00   0.00041  0.00034
+beta[status_done]                   0.1151  0.0182    0.082     0.15     1819     1224  1.00   0.00042  0.00042
+beta[status_reopened]              -0.0006   0.015   -0.028    0.029     2032     1057  1.00   0.00033  0.00037
+beta[pattern_cluster_1]             -0.098   0.024    -0.14   -0.053     1380     1177  1.00   0.00064  0.00057
+beta[pattern_cluster_2]              0.068   0.024    0.022     0.11     1289     1102  1.00   0.00067  0.00053
+beta[pattern_cluster_3]            -0.0063  0.0147   -0.032    0.022     2801     1239  1.00   0.00028  0.00038
+beta[pattern_cluster_4]              0.001   0.024   -0.045    0.046     1283     1240  1.00   0.00067  0.00051
+mu_a                                   1.2    0.11     0.98      1.4      100      236  1.02     0.011   0.0059
+sigma_a                               0.73   0.096     0.58     0.94      270      427  1.01    0.0056   0.0041
+
+=== B2_xgb_calib_no_pattern ===
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [mu_a, sigma_a, z_proj, slope]
+/usr/local/lib/python3.13/dist-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
+  return _sample_return(
+Sampling 2 chains for 800 tune and 800 draw iterations (1_600 + 1_600 draws total) took 230 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+{
+  "test_auc": 0.8541115186443029,
+  "test_brier": 0.13874311745166779,
+  "test_ece": 0.019682293128984195,
+  "mean_90pct_interval_width": 0.032897043973207474,
+  "max_rhat": 1.0137237096044234
+}
+          mean     sd eti94_lb eti94_ub ess_bulk ess_tail r_hat mcse_mean  mcse_sd
+slope    1.564  0.021      1.5      1.6     1319     1085  1.00   0.00059  0.00051
+mu_a     -0.47   0.17    -0.78    -0.14      135      170  1.01     0.015   0.0089
+sigma_a   1.03   0.13     0.82      1.3      219      301  1.00    0.0087   0.0054
+
+=== B2_xgb_calib_with_pattern ===
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [mu_a, sigma_a, z_proj, slope, gamma]
+/usr/local/lib/python3.13/dist-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
+  return _sample_return(
+Sampling 2 chains for 800 tune and 800 draw iterations (1_600 + 1_600 draws total) took 293 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
+{
+  "test_auc": 0.8524646284305831,
+  "test_brier": 0.13947175443172455,
+  "test_ece": 0.019869672927001418,
+  "mean_90pct_interval_width": 0.035968296229839325,
+  "max_rhat": 1.0288692249913225
+}
+                    mean     sd eti94_lb  eti94_ub ess_bulk ess_tail r_hat mcse_mean  mcse_sd
+slope              1.568  0.023      1.5       1.6     1647     1146  1.00   0.00056  0.00066
+mu_a                -0.5   0.19    -0.83     -0.16      114      152  1.03     0.017   0.0084
+sigma_a             1.03   0.12     0.83       1.3      353      505  1.01    0.0066   0.0052
+gamma[cluster_1]  -0.072  0.038    -0.14  -0.00076     1183     1105  1.00    0.0011  0.00091
+gamma[cluster_2]   0.271  0.062     0.15      0.38     1145      835  1.00    0.0018   0.0015
+gamma[cluster_3]   -0.63   0.54     -1.7      0.32     1441     1134  1.00     0.014    0.012
+gamma[cluster_4]   0.613  0.165      0.3      0.92     1228      727  1.00    0.0047   0.0046
+
+PSIS-LOO comparison B1_no_pattern vs B1_with_pattern:
+                 rank  elpd_diff  dse  p_worse diag_diff diag_elpd     p     elpd    se  weight
+B1_with_pattern     0        0.0  0.0      NaN                      70.7 -13600.0  93.0    0.95
+B1_no_pattern       1      -20.0  7.4      1.0                      66.9 -13700.0  93.0    0.05
+
+PSIS-LOO comparison B2_xgb_calib_no_pattern vs B2_xgb_calib_with_pattern:
+                           rank  elpd_diff  dse  p_worse diag_diff diag_elpd     p     elpd    se  weight
+B2_xgb_calib_with_pattern     0        0.0  0.0      NaN                      38.5 -12700.0  93.0    0.96
+B2_xgb_calib_no_pattern       1      -20.0  7.2      1.0                      35.1 -12800.0  93.0    0.04
+
+SUMMARY:
+                           test_auc  test_brier  test_ece  mean_90pct_interval_width  max_rhat  min_ess_bulk
+B1_no_pattern                0.8320      0.1475    0.0143                     0.0643    1.0129      166.9131
+B1_with_pattern              0.8322      0.1473    0.0146                     0.0706    1.0163      100.9841
+XGB_v4_train_only_raw        0.8031      0.1603    0.0385                        NaN       NaN           NaN
+B2_xgb_calib_no_pattern      0.8541      0.1387    0.0197                     0.0329    1.0137           NaN
+B2_xgb_calib_with_pattern    0.8525      0.1395    0.0199                     0.0360    1.0289           NaN

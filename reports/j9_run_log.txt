@@ -1,0 +1,50 @@
+/home/claude/cap/task_j9_rolling_retrain.py:44: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  ck["T"] = ck["c_s"] + np.floor(ck["elapsed_minutes"].astype(float) * 60).astype(np.int64)
+/home/claude/cap/task_j9_rolling_retrain.py:45: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  ck["T_month"] = pd.to_datetime(ck["T"], unit="s").dt.to_period("M")
+  2018-05: predict 5037 rows; train 994608 rows (0 from test-period issues)
+  2018-06: predict 10717 rows; train 1008337 rows (1180 from test-period issues)
+  2018-07: predict 10423 rows; train 1020817 rows (6539 from test-period issues)
+  2018-08: predict 10847 rows; train 1034834 rows (14048 from test-period issues)
+  2018-09: predict 10011 rows; train 1046394 rows (21579 from test-period issues)
+  2018-10: predict 10501 rows; train 1056141 rows (28441 from test-period issues)
+  2018-11: predict 10302 rows; train 1071127 rows (36167 from test-period issues)
+  2018-12: predict 9732 rows; train 1091015 rows (45215 from test-period issues)
+  2019-01: predict 8640 rows; train 1100117 rows (52633 from test-period issues)
+  2019-02: predict 11633 rows; train 1110724 rows (61631 from test-period issues)
+  2019-03: predict 11791 rows; train 1121700 rows (70717 from test-period issues)
+  2019-04: predict 12709 rows; train 1143018 rows (84315 from test-period issues)
+  2019-05: predict 10241 rows; train 1156028 rows (95375 from test-period issues)
+  2019-06: predict 10079 rows; train 1167279 rows (104896 from test-period issues)
+  2019-07: predict 9497 rows; train 1179082 rows (115229 from test-period issues)
+  2019-08: predict 9247 rows; train 1190315 rows (124982 from test-period issues)
+  2019-09: predict 8304 rows; train 1203266 rows (135803 from test-period issues)
+  2019-10: predict 8963 rows; train 1214057 rows (145214 from test-period issues)
+  2019-11: predict 8313 rows; train 1226818 rows (155625 from test-period issues)
+  2019-12: predict 7679 rows; train 1236103 rows (164150 from test-period issues)
+  2020-01: predict 7066 rows; train 1244961 rows (172078 from test-period issues)
+  2020-02: predict 7655 rows; train 1254852 rows (181069 from test-period issues)
+  2020-03: predict 8417 rows; train 1263995 rows (189392 from test-period issues)
+  2020-04: predict 9283 rows; train 1274191 rows (198898 from test-period issues)
+  2020-05: predict 8250 rows; train 1284712 rows (208759 from test-period issues)
+  2020-06: predict 7448 rows; train 1294547 rows (217804 from test-period issues)
+  2020-07: predict 7621 rows; train 1305703 rows (228420 from test-period issues)
+  2020-08: predict 5978 rows; train 1315878 rows (237655 from test-period issues)
+  2020-09: predict 4505 rows; train 1325541 rows (246768 from test-period issues)
+  2020-10: predict 1544 rows; train 1335683 rows (256010 from test-period issues)
+ subset scope      N  frozen_auc  rolling_auc   d_auc  d_auc_lo  d_auc_hi  frozen_acc  rolling_acc
+    all   all 262433      0.8657       0.8572 -0.0086   -0.0091   -0.0080      0.8019       0.7929
+    all    M1  34398      0.8033       0.7973 -0.0060   -0.0078   -0.0043      0.7272       0.7231
+    all    M3  29838      0.8323       0.8264 -0.0059   -0.0075   -0.0042      0.7627       0.7588
+    all    M5  26279      0.8626       0.8541 -0.0086   -0.0101   -0.0070      0.8063       0.7973
+    all   M10  20236      0.9110       0.9001 -0.0109   -0.0128   -0.0091      0.8857       0.8694
+   safe   all 158909      0.8572       0.8594  0.0022    0.0018    0.0026      0.8065       0.8091
+   safe    M1  20602      0.8047       0.8075  0.0028    0.0013    0.0044      0.7345       0.7355
+   safe    M3  17977      0.8298       0.8333  0.0034    0.0019    0.0049      0.7684       0.7737
+   safe    M5  15894      0.8527       0.8552  0.0025    0.0011    0.0039      0.8085       0.8122
+   safe   M10  12394      0.8838       0.8843  0.0005   -0.0012    0.0023      0.8880       0.8899
+at_risk   all 103524      0.8770       0.8570 -0.0199   -0.0209   -0.0188      0.7948       0.7680
+at_risk    M1  13796      0.8012       0.7851 -0.0161   -0.0194   -0.0127      0.7162       0.7046
+at_risk    M3  11861      0.8356       0.8198 -0.0158   -0.0193   -0.0125      0.7540       0.7363
+at_risk    M5  10385      0.8757       0.8566 -0.0190   -0.0221   -0.0158      0.8030       0.7745
+at_risk   M10   7842      0.9388       0.9166 -0.0222   -0.0253   -0.0192      0.8822       0.8371
