@@ -1,5 +1,10 @@
 # Viva / presentation prep, v6 (after Tasks H–L)
 
+> **Task M update (deployed model v6):** overall AUC is now **0.872** (5-seed ensemble 0.873), up from
+> 0.866, through rolling-origin re-tuning. M10 0.915, M8–M10 0.908, confident-late precision 97.5%.
+> Comment text and stacking were tried and did not help (`task-M-push-auc.md`). Where this doc says
+> 0.866 / 96.4%, quote the v6 numbers; the logic of every answer is unchanged.
+
 Replaces `viva-prep.md` (Aug), which predates the v5 model and still says "dynamic wins from
 M3", "93% cluster" and "cross beats within 30/38". **Don't use those lines any more.** Numbers here
 come from `paper-updates-v5.md`, `paper-updates-L.md`, `task-K-headline-metrics.md` and
@@ -82,6 +87,14 @@ censoring-safe rows and on rows whose outcome isn't already decided. The hardest
 ---
 
 # PART 2: HARD QUESTIONS
+
+## "Why isn't overall AUC above 0.9?"
+
+> "Because 'overall' averages in the very early checkpoints. At 10% of an issue's expected life
+> almost nothing has happened yet; we're at 0.81 there, and 0.90 to 0.915 from 80% onward. We
+> tried hard to push it: re-tuning across three time windows gave +0.006, comment text +0.0004,
+> and ensembles +0.0006. Every route we know to 0.9 overall uses information from after the
+> prediction moment, which would be leakage."
 
 ## "Is XGBoost even necessary?"
 
@@ -222,13 +235,13 @@ beforehand.
 |---|---|
 | Dataset | TAWOS: 458,232 issues, 39 projects, 12 repos; 203,290 resolved |
 | Test boundary | 2018-05-10 (most recent 20%) |
-| Overall AUC (v5b) | **0.866**; 0.857 with monthly retraining |
+| Overall AUC | **0.872** (v6; was 0.866 for v5b); v5b with monthly retraining 0.857 |
 | Static vs dynamic, M1 | 0.728 vs **0.803** |
 | Static vs dynamic, M10 | 0.739 vs **0.911** |
 | Late-stage AUC (M5–M10) | 0.891 (accuracy 0.848 vs majority 0.780) |
 | Hardest subset (censoring-safe, outcome open) | 0.823 |
 | Top-10% flag precision | 0.92–1.00 (base 0.56–0.78) |
-| Confident-late precision (not yet overdue) | **96.4%**, catching 28% of late issues |
+| Confident-late precision (not yet overdue) | **97.5%** (v6), catching 23% of late issues |
 | Conformal coverage (90% target) | 92% flow · 84% / 93% how-late (80 / 90% targets) · 96% Scrum (deployed) |
 | Regression SA | 59% (54% at M1 → 63% at M10) |
 | Baselines | LR 0.856 · RF 0.850 · MLP 0.864 · GRU 0.863 · literature 0.782 |
