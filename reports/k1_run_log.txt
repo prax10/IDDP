@@ -1,0 +1,71 @@
+  scrum test AUC check: 0.7473 (J5 reported 0.746)
+ mode                subset                           scope top  precision  recall  base_rate  lift
+ flow              all rows                             all  5%      1.000   0.071      0.700 1.429
+ flow              all rows                             all 10%      1.000   0.143      0.700 1.429
+ flow              all rows                             all 20%      0.996   0.285      0.700 1.423
+ flow              all rows                              M1  5%      0.973   0.088      0.556 1.750
+ flow              all rows                              M1 10%      0.956   0.172      0.556 1.721
+ flow              all rows                              M1 20%      0.898   0.323      0.556 1.617
+ flow              all rows                              M3  5%      1.000   0.078      0.638 1.568
+ flow              all rows                              M3 10%      0.992   0.156      0.638 1.556
+ flow              all rows                              M3 20%      0.964   0.302      0.638 1.511
+ flow              all rows                              M5  5%      1.000   0.070      0.713 1.403
+ flow              all rows                              M5 10%      0.999   0.140      0.713 1.401
+ flow              all rows                              M5 20%      0.992   0.278      0.713 1.391
+ flow              all rows                             M10  5%      1.000   0.060      0.839 1.193
+ flow              all rows                             M10 10%      1.000   0.119      0.839 1.193
+ flow              all rows                             M10 20%      1.000   0.239      0.839 1.193
+ flow     undetermined rows                             all  5%      0.992   0.076      0.655 1.516
+ flow     undetermined rows                             all 10%      0.984   0.150      0.655 1.503
+ flow     undetermined rows                             all 20%      0.961   0.294      0.655 1.468
+ flow     undetermined rows                              M1  5%      0.972   0.088      0.555 1.751
+ flow     undetermined rows                              M1 10%      0.955   0.172      0.555 1.720
+ flow     undetermined rows                              M1 20%      0.898   0.323      0.555 1.617
+ flow     undetermined rows                              M3  5%      0.990   0.080      0.622 1.591
+ flow     undetermined rows                              M3 10%      0.974   0.157      0.622 1.565
+ flow     undetermined rows                              M3 20%      0.944   0.303      0.622 1.517
+ flow     undetermined rows                              M5  5%      0.996   0.072      0.693 1.437
+ flow     undetermined rows                              M5 10%      0.992   0.143      0.693 1.432
+ flow     undetermined rows                              M5 20%      0.978   0.282      0.693 1.412
+ flow     undetermined rows                             M10  5%      0.997   0.066      0.751 1.327
+ flow     undetermined rows                             M10 10%      0.990   0.132      0.751 1.318
+ flow     undetermined rows                             M10 20%      0.975   0.260      0.751 1.298
+ flow   safe & undetermined                             all  5%      0.995   0.072      0.689 1.445
+ flow   safe & undetermined                             all 10%      0.988   0.143      0.689 1.434
+ flow   safe & undetermined                             all 20%      0.967   0.281      0.689 1.404
+ flow   safe & undetermined                              M1  5%      0.982   0.084      0.588 1.671
+ flow   safe & undetermined                              M1 10%      0.964   0.164      0.588 1.639
+ flow   safe & undetermined                              M1 20%      0.918   0.312      0.588 1.562
+ flow   safe & undetermined                              M3  5%      0.993   0.076      0.655 1.517
+ flow   safe & undetermined                              M3 10%      0.988   0.151      0.655 1.509
+ flow   safe & undetermined                              M3 20%      0.962   0.294      0.655 1.469
+ flow   safe & undetermined                              M5  5%      0.997   0.069      0.724 1.378
+ flow   safe & undetermined                              M5 10%      0.993   0.137      0.724 1.372
+ flow   safe & undetermined                              M5 20%      0.987   0.273      0.724 1.364
+ flow   safe & undetermined                             M10  5%      0.992   0.062      0.795 1.248
+ flow   safe & undetermined                             M10 10%      0.981   0.123      0.795 1.234
+ flow   safe & undetermined                             M10 20%      0.971   0.244      0.795 1.221
+ flow              all rows per project x checkpoint (mean) 10%      0.919     NaN      0.725 1.268
+ flow     undetermined rows per project x checkpoint (mean) 10%      0.895     NaN      0.699 1.280
+scrum committed open issues                    progress all 10%      0.952   0.142      0.671 1.418
+scrum committed open issues                    progress all 20%      0.918   0.274      0.671 1.367
+scrum committed open issues                    progress all 30%      0.886   0.396      0.671 1.320
+scrum committed open issues                    progress 0.0 10%      0.918   0.152      0.602 1.525
+scrum committed open issues                    progress 0.0 20%      0.862   0.286      0.602 1.432
+scrum committed open issues                    progress 0.0 30%      0.812   0.405      0.602 1.350
+scrum committed open issues                   progress 0.25 10%      0.936   0.145      0.645 1.450
+scrum committed open issues                   progress 0.25 20%      0.889   0.275      0.645 1.377
+scrum committed open issues                   progress 0.25 30%      0.839   0.390      0.645 1.300
+scrum committed open issues                    progress 0.5 10%      0.945   0.136      0.693 1.363
+scrum committed open issues                    progress 0.5 20%      0.895   0.258      0.693 1.291
+scrum committed open issues                    progress 0.5 30%      0.876   0.379      0.693 1.264
+scrum committed open issues                   progress 0.75 10%      0.974   0.126      0.775 1.257
+scrum committed open issues                   progress 0.75 20%      0.945   0.244      0.775 1.219
+scrum committed open issues                   progress 0.75 30%      0.939   0.364      0.775 1.212
+
+Scrum sprint-level:
+ progress  n_sprints  spill_count_MAE  mean_actual_spills  corr_expected_vs_actual  AUC_half_or_more_spill
+     0.00        475            1.620               5.674                    0.874                   0.708
+     0.25        450            1.583               5.720                    0.881                   0.711
+     0.50        420            1.459               5.952                    0.890                   0.753
+     0.75        401            1.225               6.090                    0.923                   0.760

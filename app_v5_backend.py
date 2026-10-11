@@ -18,6 +18,7 @@ import pandas as pd
 import xgboost as xgb
 
 from feature_engine import FeatureEngine, FAR
+from scrum_backend import STAGE_NAMES
 from h_common import static_cols, CATEGORICAL_COLS
 
 MODELS_DIR = "models"
@@ -136,7 +137,8 @@ class Backend:
         thr = self.live_meta["prior_match_threshold_global"]
         df = pd.DataFrame({
             "Issue_ID": ids, "Title": self.titles.reindex(ids).fillna("").to_numpy(),
-            "age_days": X["elapsed_minutes"].to_numpy() / 1440, "stage": X["status_bucket"].astype(str).to_numpy(),
+            "age_days": X["elapsed_minutes"].to_numpy() / 1440,
+            "stage": X["status_bucket"].astype(str).map(STAGE_NAMES).fillna(X["status_bucket"].astype(str)).to_numpy(),
             "assignee": iss["Assignee_ID"].reindex(ids).to_numpy(), "risk": risk,
             "flag": np.where(X["past_median"].to_numpy() == 1, "already overdue",
                              np.where(risk >= thr, "likely late", "on track")),

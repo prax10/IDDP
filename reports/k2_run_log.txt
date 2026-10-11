@@ -1,0 +1,54 @@
+severe rate by split: {'test': 0.33, 'train': 0.388, 'val': 0.351}
+/home/claude/cap/task_k2_severe_delay.py:46: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  ck["past_2x_median"] = (ck["elapsed_minutes"].astype(float).to_numpy() > 2 * pm).astype(int)
+  {'learning_rate': 0.1, 'max_depth': 6}: val AUC 0.8114, trees 97
+  {'learning_rate': 0.1, 'max_depth': 8}: val AUC 0.8115, trees 76
+  {'learning_rate': 0.05, 'max_depth': 8}: val AUC 0.8130, trees 139
+
+selected {'learning_rate': 0.05, 'max_depth': 8, 'n_estimators': 139}
+             subset scope        N  pos_rate   auc  accuracy  majority_accuracy  balanced_accuracy    f1  pr_auc  brier
+                all   all 262433.0     0.500 0.829     0.743              0.500              0.743 0.737   0.834  0.169
+                all    M1  34398.0     0.390 0.794     0.722              0.610              0.688 0.600   0.708  0.178
+                all    M3  29838.0     0.449 0.813     0.732              0.551              0.726 0.690   0.782  0.175
+                all    M5  26279.0     0.504 0.826     0.744              0.504              0.744 0.743   0.830  0.170
+                all    M8  22243.0     0.579 0.841     0.759              0.579              0.752 0.793   0.882  0.161
+                all   M10  20236.0     0.625 0.852     0.773              0.625              0.755 0.820   0.908  0.151
+       undetermined   all 255228.0     0.486 0.819     0.736              0.514              0.735 0.722   0.809  0.174
+       undetermined    M1  34395.0     0.390 0.794     0.722              0.610              0.688 0.600   0.708  0.178
+       undetermined    M3  29085.0     0.435 0.802     0.725              0.565              0.716 0.671   0.748  0.180
+       undetermined    M5  25478.0     0.488 0.815     0.736              0.512              0.735 0.726   0.803  0.176
+       undetermined    M8  21279.0     0.560 0.829     0.748              0.560              0.744 0.776   0.858  0.168
+       undetermined   M10  19222.0     0.605 0.839     0.761              0.605              0.748 0.805   0.889  0.159
+safe & undetermined   all 153153.0     0.527 0.814     0.731              0.527              0.732 0.735   0.829  0.177
+safe & undetermined    M1  20601.0     0.430 0.796     0.714              0.570              0.693 0.620   0.741  0.183
+safe & undetermined    M3  17365.0     0.474 0.799     0.721              0.526              0.717 0.688   0.774  0.184
+safe & undetermined    M5  15283.0     0.531 0.810     0.733              0.531              0.734 0.741   0.826  0.179
+safe & undetermined    M8  12817.0     0.602 0.819     0.743              0.602              0.735 0.785   0.874  0.171
+safe & undetermined   M10  11572.0     0.647 0.826     0.754              0.647              0.733 0.808   0.899  0.163
+
+Precision of top flags (severe):
+      subset scope top  precision  base_rate
+         all   all  5%      0.990      0.500
+         all   all 10%      0.965      0.500
+         all   all 20%      0.906      0.500
+         all    M1  5%      0.892      0.390
+         all    M1 10%      0.846      0.390
+         all    M1 20%      0.752      0.390
+         all    M5  5%      0.992      0.504
+         all    M5 10%      0.959      0.504
+         all    M5 20%      0.894      0.504
+         all   M10  5%      1.000      0.625
+         all   M10 10%      0.995      0.625
+         all   M10 20%      0.980      0.625
+undetermined   all  5%      0.963      0.486
+undetermined   all 10%      0.937      0.486
+undetermined   all 20%      0.876      0.486
+undetermined    M1  5%      0.892      0.390
+undetermined    M1 10%      0.846      0.390
+undetermined    M1 20%      0.751      0.390
+undetermined    M5  5%      0.963      0.488
+undetermined    M5 10%      0.923      0.488
+undetermined    M5 20%      0.858      0.488
+undetermined   M10  5%      0.992      0.605
+undetermined   M10 10%      0.984      0.605
+undetermined   M10 20%      0.960      0.605
