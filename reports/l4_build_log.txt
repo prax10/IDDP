@@ -1,0 +1,20 @@
+=== IntelDAOS
+resolved population 7,003 issues in 2 projects; split {'train': 4902, 'test': 1401, 'val': 700}; late rate 44.1%; test censoring-safe 0%
+checkpoint rows 47,227 over 6,304 issues (mean 7.49 per issue)
+features (47227, 62) -> data/external/IntelDAOS/features/checkpoint_features.parquet
+=== JFrog
+resolved population 6,656 issues in 6 projects; split {'train': 4654, 'test': 1333, 'val': 669}; late rate 51.9%; test censoring-safe 91%
+checkpoint rows 48,444 over 5,853 issues (mean 8.28 per issue)
+features (48444, 62) -> data/external/JFrog/features/checkpoint_features.parquet
+=== MariaDB
+resolved population 17,119 issues in 7 projects; split {'train': 12072, 'test': 3320, 'val': 1727}; late rate 47.2%; test censoring-safe 34%
+checkpoint rows 99,200 over 12,896 issues (mean 7.69 per issue)
+features (99200, 62) -> data/external/MariaDB/features/checkpoint_features.parquet
+=== Sakai
+resolved population 31,287 issues in 20 projects; split {'train': 21897, 'test': 6273, 'val': 3117}; late rate 48.8%; test censoring-safe 88%
+checkpoint rows 182,311 over 22,860 issues (mean 7.98 per issue)
+features (182311, 62) -> data/external/Sakai/features/checkpoint_features.parquet
+=== Qt
+resolved population 70,071 issues in 15 projects; split {'train': 49094, 'test': 13959, 'val': 7018}; late rate 46.2%; test censoring-safe 12%
+checkpoint rows 458,578 over 59,270 issues (mean 7.74 per issue)
+features (458578, 62) -> data/external/Qt/features/checkpoint_features.parquet

@@ -6,7 +6,7 @@ on it unchanged.
 
 No MongoDB server is needed: bson.decode_file_iter streams documents from the .bson file.
 
-  python3 l4_convert_jira_dump.py <path/to/Collection.bson> <out_root> [--max N]
+  python3 l4_convert_jira_dump.py <out_root> <Repo_00.bson.gz> [<Repo_01.bson.gz> ...] [--max N]
   -> <out_root>/raw/{issue_slim.csv.gz, comment.csv, change_log_status.csv.gz,
                      change_log_people.csv, change_log_sprint.csv, sprint.csv,
                      change_log_other.csv, change_log_fields.csv.gz, issue_text.csv.gz}
@@ -26,6 +26,7 @@ they can never collide with TAWOS ids).
 """
 
 import argparse
+import gzip
 import os
 import re
 from datetime import datetime
@@ -96,8 +97,8 @@ def parse_sprint(v):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("bson_file")
     ap.add_argument("out_root")
+    ap.add_argument("bson_files", nargs="+")
     ap.add_argument("--max", type=int, default=None)
     a = ap.parse_args()
     os.makedirs(f"{a.out_root}/raw", exist_ok=True)
@@ -107,8 +108,13 @@ def main():
     I, CM, ST, PE, SC, SP, FL, TX = [], [], [], [], [], [], [], []
     sprints = {}
     n = 0
-    with open(a.bson_file, "rb") as fh:
-        for doc in bson.decode_file_iter(fh):
+    def docs():
+        for p in a.bson_files:
+            with (gzip.open(p, "rb") if p.endswith(".gz") else open(p, "rb")) as fh:
+                yield from bson.decode_file_iter(fh)
+
+    if True:
+        for doc in docs():
             n += 1
             if a.max and n > a.max:
                 break
@@ -173,6 +179,7 @@ def main():
                 print(f"  {n:,} documents", flush=True)
 
     out = f"{a.out_root}/raw"
+    gz = lambda name: f"{out}/{name}.gz" if not name.endswith(".gz") else f"{out}/{name}"
     iss = pd.DataFrame(I)
     # final story points: last story-point changelog value (custom field ids differ per repo)
     sp = pd.DataFrame(SP, columns=["Issue_ID", "Change_Type", "From_String", "To_String", "Creation_Date"])
@@ -180,15 +187,15 @@ def main():
         last_sp = sp.sort_values("Creation_Date").groupby("Issue_ID")["To_String"].last()
         iss["Story_Point"] = pd.to_numeric(iss["ID"].map(last_sp), errors="coerce")
     iss.to_csv(f"{out}/issue_slim.csv.gz", index=False)
-    pd.DataFrame(TX).to_csv(f"{out}/issue_text.csv.gz", index=False)
-    pd.DataFrame(CM, columns=["Issue_ID", "Creation_Date", "Author_ID"]).to_csv(f"{out}/comment.csv", index=False)
+    pd.DataFrame(TX).to_csv(gz("issue_text.csv.gz"), index=False)
+    pd.DataFrame(CM, columns=["Issue_ID", "Creation_Date", "Author_ID"]).to_csv(gz("comment.csv"), index=False)
     pd.DataFrame(ST, columns=["Issue_ID", "Change_Type", "From_String", "To_String", "Creation_Date"]).to_csv(
         f"{out}/change_log_status.csv.gz", index=False)
     pd.DataFrame(PE, columns=["Issue_ID", "Change_Type", "Field", "From_String", "To_String", "Creation_Date"]).to_csv(
-        f"{out}/change_log_people.csv", index=False)
+        gz("change_log_people.csv"), index=False)
     pd.DataFrame(SC, columns=["Issue_ID", "Change_Type", "Field", "From_String", "To_String", "Creation_Date"]).to_csv(
-        f"{out}/change_log_sprint.csv", index=False)
-    sp.to_csv(f"{out}/change_log_other.csv", index=False)
+        gz("change_log_sprint.csv"), index=False)
+    sp.to_csv(gz("change_log_other.csv"), index=False)
     pd.DataFrame(FL, columns=["Issue_ID", "Field", "From_String", "To_String", "Creation_Date"]).to_csv(
         f"{out}/change_log_fields.csv.gz", index=False)
     spr = pd.DataFrame([{"ID": i + 1, "JiraID": s.get("id"), "Name": s["name"], "State": s.get("state"),
@@ -197,10 +204,10 @@ def main():
                          "Project_ID": pid} for i, ((pid, _), s) in enumerate(sprints.items())],
                        columns=["ID", "JiraID", "Name", "State", "Start_Date", "End_Date", "Activated_Date",
                                 "Complete_Date", "Project_ID"])
-    spr.to_csv(f"{out}/sprint.csv", index=False)
+    spr.to_csv(gz("sprint.csv"), index=False)
     pd.Series({k: v for k, v in proj_ids.m.items()}).rename("Project_ID").to_csv(f"{out}/project_map.csv")
     res = iss["Resolution_Date"].notna()
-    print(f"{a.bson_file}: {len(iss):,} issues ({res.mean():.0%} resolved), {iss.Project_ID.nunique()} projects, "
+    print(f"{a.out_root}: {len(iss):,} issues ({res.mean():.0%} resolved), {iss.Project_ID.nunique()} projects, "
           f"{len(CM):,} comments, {len(ST):,} status changes, {len(PE):,} assignee changes, {len(SC):,} sprint changes, "
           f"{len(sp):,} story-point changes, {len(FL):,} other field changes, {len(spr):,} sprints")
 

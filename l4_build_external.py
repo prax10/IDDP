@@ -89,10 +89,24 @@ def expected_duration_proxy(df):
     return out
 
 
+def dedupe_raw(raw):
+    """the dump holds a few issues twice (e.g. moved between projects): keep one copy of each issue
+    and drop exact duplicate change-log rows so no history is double counted"""
+    import glob
+    for f in sorted(glob.glob(f"{raw}/*.csv*")):
+        x = pd.read_csv(f, low_memory=False)
+        n = len(x)
+        x = x.drop_duplicates("ID", keep="last") if os.path.basename(f).startswith("issue_slim") else x.drop_duplicates()
+        if len(x) < n:
+            x.to_csv(f, index=False)
+            print(f"  dedupe {os.path.basename(f)}: -{n - len(x)} rows", flush=True)
+
+
 def main():
     root = sys.argv[1]
     raw, feat = f"{root}/raw", f"{root}/features"
     os.makedirs(feat, exist_ok=True)
+    dedupe_raw(raw)
     iss = pd.read_csv(f"{raw}/issue_slim.csv.gz")
     iss["c_s"], iss["r_s"] = secs(iss["Creation_Date"]), secs(iss["Resolution_Date"])
     ok = (iss["c_s"] > 0) & (iss["r_s"] > iss["c_s"]) & iss["Resolution"].astype(str).str.lower().str.strip().isin(COMPLETED)

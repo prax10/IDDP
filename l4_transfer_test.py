@@ -5,7 +5,8 @@ has never seen?
   python3 l4_transfer_test.py <ext_root> [<ext_root2> ...]
 
 Portable feature set = the v5b live features minus anything tied to TAWOS itself:
-  dropped  Project_ID (unseen categories), text_pc_* (TAWOS-fitted SBERT->PCA), and the
+  dropped  comment features (the Public Jira Dataset contains no comments) and time since any
+           activity (it mixes comments in); Project_ID (unseen categories), text_pc_* (TAWOS-fitted SBERT->PCA), and the
            creation-time static columns built by the TAWOS Phase-6 notebook
            (assignee_prior_*, assignee_concurrent_open, is_unassigned, n_links,
            n_blocking_links, Story_Point) -- their dynamic, known-at-T versions stay in
@@ -34,7 +35,10 @@ from task_j4_v5_model import load_all
 
 SEEDS = [0, 1, 2]
 DROP = {"Project_ID", "assignee_prior_resolved_count", "assignee_prior_delay_rate", "assignee_concurrent_open",
-        "is_unassigned", "n_links", "n_blocking_links", "Story_Point"}
+        "is_unassigned", "n_links", "n_blocking_links", "Story_Point",
+        # the Public Jira Dataset ships no comments, so every comment-derived feature is dropped too
+        "n_comments", "n_comment_authors", "comments_last_7d", "log_min_since_last_comment",
+        "log_min_since_last_activity"}
 CATS = ["Priority_Normalized", "Type_Normalized", "status_bucket"]
 
 

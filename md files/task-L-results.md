@@ -10,7 +10,7 @@ unless stated. Nothing below was tuned on test.
 | L1b | Patterns re-tested | Balanced *shape* clusters do help the old feature set (+0.011 AUC at M3–M5), but add **nothing** on top of v5b activity features. |
 | L2 | Regression ("how late") | SA 59% overall (54% at M1 → 63% at M10); beats project-median and creation-time regressors; calibrated 80% intervals. |
 | L3 | Stronger baselines | XGBoost v5b stays best (AUC 0.866). MLP 0.864, GRU 0.863, logistic regression 0.856, RF 0.850, literature features 0.782. **The features matter more than the learner.** An untuned XGB+MLP+GRU average adds +0.005 (+0.013 at M1). |
-| L4 | External dataset | __L4__ |
+| L4 | External dataset | On **5 Jira organisations never seen in training** (Montgomery et al.'s Public Jira Dataset), the TAWOS model with no retraining gets AUC **0.755–0.852 (mean 0.801)**. It is equal to or better than a model trained on each repo's own history in 3 of 5 (mean 0.792). Pooling TAWOS with the repo's own history is best on 4 of 5 (mean 0.804). |
 | L5 | Uncertainty | 90% conformal sets cover 92% on test; CQR intervals cover 84% / 93% (80% / 90% targets); sprint spill-count ranges cover 88–92% where a naive interval covers 69–77%. |
 | L6 | "What would help" | Counterfactual re-scoring for 4 actions. In the test-period history every action points the same way, but status-move effects are overstated about 2×. Shown in the app with that caveat. |
 
@@ -133,7 +133,71 @@ intervals are a paired bootstrap of the AUC difference against XGBoost (500 resa
 
 ## L4 — External dataset validation
 
-__L4_DETAIL__
+**Data.** The Public Jira Dataset (Montgomery et al., MSR 2022; Zenodo 10.5281/zenodo.5882881,
+CC BY 4.0; 2025 anonymised release) has 16 public Jira repositories. We used the five that are **not
+part of TAWOS**: MariaDB, Qt, Sakai, JFrog and IntelDAOS. That is 255k issues in 5 organisations
+that the model has never seen.
+
+**Pipeline** (`l4_extract_archive.py` → `l4_convert_jira_dump.py` → `l4_build_external.py` → `l4_transfer_test.py`).
+1. **Extract.** The 60 GB mongodump archive is streamed straight out of the zip with the
+   standard library: no MongoDB server and no unzipping. It takes about 100 seconds on the laptop.
+2. **Convert.** Jira JSON is mapped to the TAWOS raw-table layout with the same rules: the
+   status / assignee / sprint / story-point changelogs, and the same 10 field-change types.
+3. **Rebuild, with TAWOS definitions:**
+   - population: issues resolved as completed work (the TAWOS keep-list: Fixed / Done / …);
+   - split: chronological 70/10/20 within each repo;
+   - label: resolution time > the project's train+val median;
+   - checkpoints: k/10 × an expanding hierarchical median, strictly from earlier issues;
+   - features: computed by the unchanged `FeatureEngine`.
+
+   **Self-test:** run on a TAWOS project as if it were external, the pipeline reproduced the
+   TAWOS population exactly (2,210 / 2,210 issues) and 99.95% of checkpoint rows, with 99.9%
+   of checkpoint times within 5%. The activity features matched 100% wherever the checkpoint
+   moment matched.
+4. **Portable model.** Some v5b features cannot exist outside TAWOS, so they are dropped, leaving
+   **49 of 92**. Dropped:
+   - Project_ID;
+   - the 30 TAWOS-fitted text components;
+   - the creation-time static columns from the TAWOS notebook;
+   - **comment features**, because this dataset ships no comments. It is the one real
+     information loss.
+
+   The cost of being portable, measured on TAWOS test: **0.866 → 0.858**.
+
+**Results** (AUC on each repo's chronological test period; 3 seeds; paired bootstrap of A vs B):
+
+| repo | test issues | late rate | **A: zero-shot** (TAWOS only) | B: own history only | C: TAWOS + own | A − B [95% CI] | A at M1 → M10 |
+|---|---|---|---|---|---|---|---|
+| IntelDAOS | 1,230 | 36% | **0.852** | 0.850 | 0.852 | +0.003 [−0.001, +0.007], equivalent | 0.754 → 0.900 |
+| JFrog | 1,148 | 82% | **0.838** | 0.822 | 0.845 | **+0.016 [+0.010, +0.023]** | 0.743 → 0.915 |
+| MariaDB | 2,466 | 65% | 0.794 | 0.799 | 0.802 | −0.004 [−0.007, −0.001] | 0.693 → 0.866 |
+| Sakai | 4,987 | 74% | 0.755 | 0.769 | 0.782 | −0.014 [−0.018, −0.009] | 0.663 → 0.786 |
+| Qt | 11,326 | 54% | **0.765** | 0.718 | 0.740 | **+0.047 [+0.044, +0.050]** | 0.663 → 0.849 |
+| **mean** | | | **0.801** | 0.792 | 0.804 | | |
+
+**What this shows.**
+1. **The model transfers across organisations.** Zero-shot AUC stays at 0.76–0.85 on companies
+   and communities it never saw, against 0.858 on TAWOS for the same feature set.
+2. **TAWOS history is as good as, or better than, a repo's own history** (3 of 5). Where a repo's
+   own past is a poor guide to its future (Qt: AUC 0.718 within-repo), the broad TAWOS training
+   wins clearly. This extends the Phase-9 cross-project result (30/38 projects) from projects
+   *inside* TAWOS to whole new organisations.
+3. **Pooling is the safest default:** best or tied on 4 of 5.
+4. **The "dynamic beats static from early on" shape replicates.** AUC rises from M1 to M10 on
+   every repo, by +0.12 to +0.19.
+
+**Caveats (state them).**
+- **Censoring.** The dump ends in 2021–22. For IntelDAOS (0% of test issues censoring-safe) and
+  Qt (12%), the test period is dominated by recent issues, where only quicker ones could be
+  resolved yet. On Qt's censoring-safe subset, zero-shot AUC is 0.818 (all rows: 0.765). The
+  ranking result holds on both, but the absolute numbers for these two repos are less certain.
+- **Thresholds don't transfer.** Accuracy at 0.5 for zero-shot IntelDAOS is 0.608, against 0.742
+  within-repo, because its late rate (36%) is far from TAWOS's. Ranking (AUC) transfers;
+  a decision threshold needs re-setting per organisation, e.g. with the prior-match rule on a
+  little local history.
+- **No comments** in this dataset, so these numbers are for a weaker feature set than the app uses.
+- B and C are unweighted (TAWOS recency weights are tuned on TAWOS). The anonymised dataset maps
+  people consistently within a repo, so track-record features still work.
 
 ## L5 — Uncertainty with coverage guarantees
 
