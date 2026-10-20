@@ -1,0 +1,3 @@
+model,window1,window2,mean_window_auc,best_iters,note
+xgb v8 (d8 mcw50 col.6),0.8446,0.8581,0.8249,229,
+cat d8 lr.05,0.8371,,,468,stopped after window 1: 0.0075 below XGBoost on the same window

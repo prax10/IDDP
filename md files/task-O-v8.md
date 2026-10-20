@@ -53,3 +53,18 @@ Final set chosen with 3 validation seeds (`o3_v8_selection.csv`): priority/type 
   outcome is not yet decided).
 
 Models: `models/xgb_v8_seed{0..4}.json`, `xgb_v8_meta.json` (the app still loads v6).
+
+## Update: final v8 = 229 trees (Task P)
+
+Tree count re-chosen on the three rolling windows (mean window AUC 0.8249 at 229 trees vs 0.8241 at 130).
+**Final v8 test AUC 0.869 (seed mean 0.8693), 0.870 for the 5-model ensemble (0.8704)**; +0.0006
+[+0.0005, +0.0008] over 130 trees, +0.0016 at M1. Balanced accuracy 0.743, Brier 0.131.
+
+Other learners tried on v8 features (`task_p1_big_swings.py`, `task_p2_catboost_rolling.py`):
+- LightGBM and slow-learning XGBoost looked better on the single validation window only by stopping after
+  33–97 trees: that window rewards near-empty models (true since Phase 8) and it has not carried to test.
+- CatBoost on the first rolling window: 0.837 vs 0.845 for XGBoost on the same window. Stopped.
+- XGBoost + MLP blend: lower on validation.
+
+Conclusion: the learner is not the bottleneck. 0.89 overall is out of reach without information from after
+the prediction moment. Honest 0.89+ numbers: M5–M10 0.892, M6–M10 0.898, M8–M10 0.904, clear-cut 0.926.

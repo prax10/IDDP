@@ -83,7 +83,9 @@ def test_stage(names, cfg=None, tag=""):
 
 
 if __name__ == "__main__":
-    if sys.argv[1] == "val":
+    if sys.argv[1] == "test229":   # tree count chosen on the 3 rolling windows (task_p2, mean window AUC 0.8249 @ 229 vs 0.8241 @ 130)
+        test_stage(["v8"], cfg={**CFG, "n_estimators": 229}, tag="_229")
+    elif sys.argv[1] == "val":
         val_stage(sys.argv[2:] or list(VARIANTS))
     else:
         test_stage(sys.argv[2:])
