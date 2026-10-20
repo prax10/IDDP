@@ -15,17 +15,19 @@ from sklearn.metrics import roc_auc_score
 from h_common import REPORTS_DIR, MODELS_DIR, seeded
 from task_i2_model_upgrades import weights
 import task_n2_v7_model as n2
+import task_o2_v8_model as o2
 
 R = 1.5
 
 
 def main(variant):
-    cols = n2.VARIANTS[variant]
+    src = o2 if variant in o2.VARIANTS and variant not in n2.VARIANTS else n2
+    cols = src.VARIANTS[variant]
     cfg, hl = n2.CFG, n2.HL
     if len(sys.argv) > 2:
         j = json.load(open(sys.argv[2]))
         cfg, hl = j["config"], j["half_life"]
-    ck = n2.data()
+    ck = src.data()
     iss = pd.read_csv("data/raw/issue_slim.csv.gz", usecols=["ID", "Project_ID", "Creation_Date", "Resolution_Date"],
                       parse_dates=["Creation_Date", "Resolution_Date"], date_format="ISO8601")
     sp = pd.read_csv("data/features/phase8_split.csv", usecols=["ID", "split"])
