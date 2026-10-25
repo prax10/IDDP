@@ -1,0 +1,48 @@
+/home/claude/cap/task_n1_v7_features.py:52: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  out = (dt - pd.Timestamp("1970-01-01")) // pd.Timedelta(seconds=1)
+/home/claude/cap/task_n1_v7_features.py:52: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  out = (dt - pd.Timestamp("1970-01-01")) // pd.Timedelta(seconds=1)
+rows 1342536
+/home/claude/cap/task_n1_v7_features.py:52: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  out = (dt - pd.Timestamp("1970-01-01")) // pd.Timedelta(seconds=1)
+  A: 448089 link events, 91406 keys mapped, events with mapped target 0.449
+  A: rows with a link at T 0.254, blocked-by 0.0424, open blocker 0.0192
+/home/claude/cap/task_n1_v7_features.py:52: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  out = (dt - pd.Timestamp("1970-01-01")) // pd.Timedelta(seconds=1)
+  B: rows with a fix version at T 0.240, placeholder 0.055
+/home/claude/cap/task_n1_v7_features.py:52: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  out = (dt - pd.Timestamp("1970-01-01")) // pd.Timedelta(seconds=1)
+  C: assignee at T differs from final assignee on 0.456 of rows; unassigned at T 0.371 (final 0.148)
+  C: done
+saved (1342536, 26) -> data/features/phase8_v7_features.csv
+
+|corr| with delayed_v2:
+log_min_since_link_change    0.275
+log_fixver_days_left_est     0.255
+assignee_rate_known_T        0.163
+a_n_res_30d                  0.156
+log_fixver_age_days          0.153
+a_n_res_90d                  0.152
+a_last5_late                 0.145
+a_rate_90d                   0.144
+assignee_n_known_T           0.137
+fixver_done_share            0.137
+is_unassigned_T              0.125
+log_fixver_assigned          0.112
+log_a_days_since_res         0.109
+n_fixver_at_T                0.095
+has_fixver_at_T              0.081
+log_fixver_resolved_14d      0.056
+fixver_placeholder           0.045
+n_open_blockers_at_T         0.028
+any_open_blocker             0.027
+n_blockers_resolved_7d       0.022
+n_blocks_at_T                0.017
+n_dup_at_T                   0.017
+n_blockedby_at_T             0.012
+n_links_at_T                 0.002
+Leakage test: PASS
+
+real	0m36.947s
+user	0m35.128s
+sys	0m1.328s
