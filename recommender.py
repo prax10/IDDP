@@ -97,6 +97,68 @@ def reassign_variants(X, colleagues):
     return out
 
 
+ASSIGNEE_COLS = {"assignee_prior_resolved_count", "assignee_prior_delay_rate", "assignee_concurrent_open",
+                 "is_unassigned", "assignee_open_at_T", "n_assignee_changes", "ever_reassigned", "assigned_at_T",
+                 "log_min_since_assign_change", "log_min_to_first_assign", "assignee_rate_known", "assignee_n_known"}
+MIN_GAIN = 0.05     # a swap must cut risk by >= 0.05 to count as "may help"
+
+
+def assignee_record(fe, project, T, aid):
+    """Known-at-T record of one assignee in the project: resolved, share late, open now (all projects)."""
+    if aid is None or pd.isna(aid):
+        return None
+    aid = int(aid)
+    r = fe.res[(fe.res["Project_ID"] == project) & (fe.res["r_s"] < T) & (fe.res["Assignee_ID"] == aid)]
+    c_keys, r_keys = fe.open_idx["Assignee_ID"]
+    q, b = np.int64(aid) * SCALE + T, np.int64(aid) * SCALE
+    open_now = int((np.searchsorted(c_keys, q) - np.searchsorted(c_keys, b)) -
+                   (np.searchsorted(r_keys, q) - np.searchsorted(r_keys, b)))
+    n = len(r)
+    return {"n": n, "late": float(r["delayed_v2"].mean()) if n else np.nan, "open_now": max(open_now, 0)}
+
+
+def reassignment_options(backend, issue_id, date, top_colleagues=10):
+    """Score handing this issue to each active colleague. Returns a dict for the UI:
+    base risk, current assignee + record, candidate table (best first), verdict, assignee share of the score."""
+    T = int(pd.Timestamp(date).timestamp())
+    X = backend._design([issue_id], [T])
+    cols = backend.cols
+    base = float(backend._predict(backend.live, X, cols)[0])
+    info = backend.fe.iss.loc[issue_id]
+    project, cur = info["Project_ID"], info["Assignee_ID"]
+
+    # how much of this issue's score comes from who it is assigned to (exact TreeSHAP, model 0)
+    _, C = backend._reasons(X, k=3)
+    row = C.iloc[0]
+    a_cols = [c for c in row.index if c in ASSIGNEE_COLS]
+    total = float(row.abs().sum()) or 1.0
+    assignee_share = float(row[a_cols].abs().sum()) / total
+    top3 = row.abs().sort_values(ascending=False).index[:3]
+    assignee_in_top3 = any(c in ASSIGNEE_COLS for c in top3)
+
+    col = active_colleagues(backend.fe, project, T, current=cur, top=top_colleagues)
+    rows = []
+    if len(col):
+        for aid, Xa in reassign_variants(X, col).items():
+            p = float(backend._predict(backend.live, Xa, cols)[0])
+            r = col.loc[aid]
+            rows.append({"assignee": int(aid), "resolved_here": int(r["n"]), "late_rate": r["delayed"] / r["n"],
+                         "open_now": int(max(r["open_now"], 0)), "risk_if_reassigned": p, "change": p - base})
+    cand = pd.DataFrame(rows)
+    if len(cand):
+        cand = cand.sort_values("risk_if_reassigned").reset_index(drop=True)
+    best = cand.iloc[0] if len(cand) else None
+    if best is None:
+        verdict = "no_candidates"
+    elif best["change"] <= -MIN_GAIN:
+        verdict = "may_help"
+    else:
+        verdict = "unlikely"
+    return {"base": base, "current": None if pd.isna(cur) else int(cur),
+            "current_record": assignee_record(backend.fe, project, T, cur), "candidates": cand,
+            "verdict": verdict, "assignee_share": assignee_share, "assignee_in_top3": assignee_in_top3}
+
+
 def recommend(backend, issue_id, date, top_colleagues=8):
     T = int(pd.Timestamp(date).timestamp())
     X = backend._design([issue_id], [T])

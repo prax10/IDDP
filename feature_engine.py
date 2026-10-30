@@ -106,7 +106,7 @@ class FeatureEngine:
         self.iss = iss.set_index("ID", drop=False)
         log("  issues loaded", flush=True)
 
-        cm = pd.read_csv(f"{RAW_DIR}/comment.csv")
+        cm = pd.read_csv(_first(f"{RAW_DIR}/comment.csv", f"{RAW_DIR}/comment.csv.gz"))
         cm["t"] = secs(cm["Creation_Date"])
         cm = cm.sort_values(["Issue_ID", "t"], kind="mergesort")
         first_auth = (~cm.duplicated(["Issue_ID", "Author_ID"])).astype(int).to_numpy()
@@ -161,7 +161,7 @@ class FeatureEngine:
                           {k: fl["Field"].isin(v).to_numpy(int) for k, v in self.field_groups.items()})
         log("  change logs loaded", flush=True)
 
-        lab = pd.read_csv(f"{FEATURES_DIR}/phase6_feature_table_v3.csv", usecols=["ID", "delayed_v2"])
+        lab = pd.read_csv(_first(f"{FEATURES_DIR}/phase6_feature_table_v3.csv", f"{FEATURES_DIR}/phase6_feature_table_v3.csv.gz"), usecols=["ID", "delayed_v2"])
         self.res = iss.merge(lab, on="ID")
         split = pd.read_csv(f"{FEATURES_DIR}/phase8_split.csv")
         rr = iss.merge(split[["ID", "split"]], on="ID")

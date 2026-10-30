@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 
-from feature_engine import FeatureEngine, FAR
+from feature_engine import FeatureEngine, FAR, _first
 from scrum_backend import STAGE_NAMES
 from h_common import static_cols, CATEGORICAL_COLS
 
@@ -77,10 +77,10 @@ class Backend:
             self.scrum = _ensemble("xgb_scrum_spillover", self.scrum_meta["seeds"])
         except FileNotFoundError:
             self.scrum_meta, self.scrum = None, None
-        feat = pd.read_csv("data/features/phase6_feature_table_v3.csv")
+        feat = pd.read_csv(_first("data/features/phase6_feature_table_v3.csv", "data/features/phase6_feature_table_v3.csv.gz"))
         self.static = feat.set_index("ID")
         try:
-            titles = pd.read_csv("data/raw/issue.csv", usecols=["ID", "Title"]).set_index("ID")["Title"]
+            titles = pd.read_csv(_first("data/raw/issue.csv", "data/raw/issue_titles.csv.gz"), usecols=["ID", "Title"]).set_index("ID")["Title"]
         except (FileNotFoundError, ValueError):
             titles = pd.Series(dtype=str)
         self.titles = titles.astype(str).str.strip('"')
@@ -160,6 +160,59 @@ class Backend:
         from recommender import recommend
         return recommend(self, issue_id, date)
 
+    def reassignment(self, issue_id, date):
+        from recommender import reassignment_options
+        return reassignment_options(self, issue_id, date)
+
+    def project_median_days(self, project):
+        """The project's typical time to close (median, train+val issues). Older than this = 'already overdue'."""
+        return float(self.fe.proj_median_min.get(project, np.nan)) / 1440
+
+    def type_history(self, project, date):
+        """Every issue in the project resolved before `date`: its type and how many days it took.
+        Used for the manager's per-type targets (history medians and 'would have missed' checks)."""
+        T = int(pd.Timestamp(date).timestamp())
+        r = self.fe.res[(self.fe.res["Project_ID"] == project) & (self.fe.res["r_s"] < T)]
+        return pd.DataFrame({"type": self.static["Type_Normalized"].reindex(r["ID"]).astype(str).to_numpy(),
+                             "days": (r["r_s"] - r["c_s"]).to_numpy() / 86400})
+
+    def outcomes(self, ids, date):
+        """For issues resolved before `date`: when, and whether they finished late (known at `date`)."""
+        T = int(pd.Timestamp(date).timestamp())
+        ids = np.asarray(list(ids), dtype=np.int64)
+        r = self.fe.iss["r_s"].reindex(ids).to_numpy()
+        late = self.static["delayed_v2"].reindex(ids).to_numpy()
+        done = r <= T
+        return pd.DataFrame({"Issue_ID": ids, "resolved": done,
+                             "resolved_at": pd.to_datetime(np.where(done, r, 0), unit="s"),
+                             "finished_late": np.where(done, late, np.nan)})
+
+    def team_workload(self, project, date, open_df):
+        """Per assignee, as of `date`: open work in this project (by flag), average risk, open work across
+        all projects, and their known-at-date record in this project. `open_df` = open_issues(project, date)."""
+        T = int(pd.Timestamp(date).timestamp())
+        if open_df.empty:
+            return pd.DataFrame()
+        d = open_df.assign(who=open_df["assignee"].fillna(-1).astype(np.int64))
+        g = d.groupby("who").agg(open_here=("Issue_ID", "size"),
+                                 likely_late=("flag", lambda s: int((s == "likely late").sum())),
+                                 overdue=("flag", lambda s: int((s == "already overdue").sum())),
+                                 avg_risk=("risk", "mean"))
+        g["on_track"] = g["open_here"] - g["likely_late"] - g["overdue"]
+        from recommender import assignee_record
+        recs = {w: (assignee_record(self.fe, project, T, w) if w != -1 else None) for w in g.index}
+        g["open_all_projects"] = [r["open_now"] if r else np.nan for r in recs.values()]
+        g["resolved_here"] = [r["n"] if r else np.nan for r in recs.values()]
+        g["late_rate"] = [r["late"] if r else np.nan for r in recs.values()]
+        people = g.drop(index=-1, errors="ignore")
+        med = people["open_all_projects"].median() if len(people) else np.nan
+        g["load"] = np.where(g.index == -1, "unassigned",
+                             np.where((g["open_all_projects"] >= max(2 * (med if med == med else 0), 5)), "overloaded",
+                                      np.where(g["likely_late"] + g["overdue"] >= 3, "at risk", "ok")))
+        g = g.reset_index().rename(columns={"who": "assignee"})
+        g["assignee"] = np.where(g["assignee"] == -1, "unassigned", g["assignee"].astype(str))
+        return g.sort_values(["likely_late", "open_here"], ascending=False).reset_index(drop=True)
+
     # ------------------------------------------------------------------ portfolio
     def projects(self):
         iss = self.fe.iss
@@ -189,6 +242,8 @@ class Backend:
             "confidence": self.confidence(risk),
             "why": [", ".join(f"{n} ({'↑' if v > 0 else '↓'})" for n, v in r) for r in reasons],
         })
+        df["type"] = self.static["Type_Normalized"].reindex(ids).astype(str).to_numpy()
+        df["median_days"] = self.project_median_days(project)
         lo, hi = self.finish_interval(X, np.full(len(ids), project))
         df["finish_in"] = [f"{a:.0f}–{b:.0f} days" if np.isfinite(a) else "" for a, b in zip(lo, hi)]
         df["finish_lo"], df["finish_hi"] = lo, hi
